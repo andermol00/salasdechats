@@ -66,45 +66,54 @@ git push -u origin main
 
 ## Desplegar en Render.com
 
-### Opción A — Blueprint (`render.yaml`)
+### Opción A — Blueprint (`render.yaml`) — recomendada
 
-1. Sube el repo a GitHub.
+1. Sube el repo a GitHub (sin ZIP dentro, todo descomprimido en la raíz).
 2. En Render: **New +** → **Blueprint**.
-3. Conecta el repositorio.
-4. Render crea el web service y la base PostgreSQL, e inyecta `DATABASE_URL`.
+3. Conecta el repositorio y sincroniza.
+4. Render crea el web service `vela-chat` y la base `vela-db`, e inyecta `DATABASE_URL`.
 
-El comando de arranque aplica el esquema y luego sirve Next.js:
-
-```bash
-npx drizzle-kit push --force && npm run start
-```
+El arranque aplica el esquema y luego sirve Next.js (`scripts/start.sh`).
 
 ### Opción B — Manual
 
-1. Crea una **PostgreSQL** en Render y copia la Internal (o External) Database URL.
-2. Crea un **Web Service** desde el repo.
-3. Runtime: Node.
-4. Build command:
+1. Crea una **PostgreSQL** en Render y copia la Internal Database URL.
+2. Crea un **Web Service** desde el repo con **Language: Node**.
+3. Build command:
 
 ```bash
-npm install && npm run build
+npm install --include=dev && npm run build
 ```
 
-5. Start command:
+4. Start command:
 
 ```bash
-npx drizzle-kit push --force && npm run start
+bash scripts/start.sh
 ```
 
-6. Environment:
+5. Environment:
 
 | Clave | Valor |
 | --- | --- |
 | `DATABASE_URL` | URL de la base Render |
 | `NODE_ENV` | `production` |
 | `NODE_VERSION` | `22` |
+| `NPM_CONFIG_PRODUCTION` | `false` |
+| `NPM_CONFIG_INCLUDE` | `dev` |
 
-Render usa SSL para Postgres; la app ya lo activa fuera de localhost.
+## Problemas típicos en Render
+
+**`mix phx.digest` / "no mix.exs was found"**
+Render detectó el proyecto como Elixir. El servicio debe ser **Node**. Bórralo y crea uno nuevo por **Blueprint**, o cambia el Language a Node.
+
+**`Cannot find module '@tailwindcss/postcss'` o `tsc: not found`**
+Render puso `NODE_ENV=production` y `npm install` saltó las devDependencies. Por eso el build usa `npm install --include=dev` y las variables `NPM_CONFIG_PRODUCTION=false` / `NPM_CONFIG_INCLUDE=dev`.
+
+**`self signed certificate` al conectar a Postgres**
+Ya está resuelto: la app usa SSL sin verificación estricta fuera de localhost, y `drizzle.config.ts` añade `sslmode=no-verify`.
+
+**El deploy queda en "in progress" y luego falla el healthcheck**
+Comprueba que `DATABASE_URL` esté enlazada a la base y revisa los logs del start: el esquema se aplica antes de arrancar.
 
 ## Cómo funciona la sesión
 

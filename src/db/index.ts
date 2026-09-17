@@ -8,8 +8,12 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
-const isLocal =
-  databaseUrl.includes("127.0.0.1") || databaseUrl.includes("localhost");
+function needsSsl(url: string) {
+  if (process.env.DATABASE_SSL === "false") return false;
+  if (process.env.DATABASE_SSL === "true") return true;
+  if (/sslmode=disable/.test(url)) return false;
+  return !(url.includes("127.0.0.1") || url.includes("localhost"));
+}
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -19,7 +23,10 @@ export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: databaseUrl,
-    ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    ssl: needsSsl(databaseUrl) ? { rejectUnauthorized: false } : undefined,
+    max: 8,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
   });
 
 if (process.env.NODE_ENV !== "production") {
