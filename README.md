@@ -1,0 +1,115 @@
+# VELA
+
+Salas de chat temporales. Enciendes un código, hablas con quien lo conozca y a las **24 horas** la sala, los mensajes y la presencia se apagan solos. No hay cuentas ni historial permanente.
+
+Inspirado en la idea de compartir un código para coincidir en la misma sala, con una experiencia propia: recargas y sigues dentro, avisos de mensajes, temas y ajustes de lectura.
+
+## Qué incluye
+
+- Crear o entrar a una sala con apodo + código
+- Persistencia local: si recargas, vuelves a la misma sala con el mismo usuario
+- Caducidad real de 24 horas (PostgreSQL + limpieza automática)
+- Lista de personas en línea
+- Notificaciones sonoras y del sistema (cuando la pestaña no está activa)
+- Ajustes: tema, color, tamaño, vista compacta, Enter para enviar
+- Enlace de invitación para compartir
+- Pensado para subir a **GitHub** y desplegar en **Render.com**
+
+## Stack
+
+- Next.js (App Router)
+- PostgreSQL + Drizzle ORM
+- Tiempo real ligero por sincronización cada ~1.4s
+
+## Arranque local
+
+1. Instala dependencias:
+
+```bash
+npm install
+```
+
+2. Crea un archivo `.env` (no se sube a GitHub):
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/app_db
+```
+
+3. Crea las tablas:
+
+```bash
+npx drizzle-kit push
+```
+
+4. Arranca:
+
+```bash
+npm run dev
+```
+
+Abre [http://localhost:3000](http://localhost:3000).
+
+## Subir a GitHub
+
+En la carpeta del proyecto:
+
+```bash
+git init
+git add .
+git commit -m "VELA: salas de chat temporales de 24 horas"
+git branch -M main
+git remote add origin https://github.com/TU_USUARIO/vela.git
+git push -u origin main
+```
+
+`.env` queda fuera del repositorio gracias a `.gitignore`. En GitHub solo vive `.env.example` como plantilla.
+
+## Desplegar en Render.com
+
+### Opción A — Blueprint (`render.yaml`)
+
+1. Sube el repo a GitHub.
+2. En Render: **New +** → **Blueprint**.
+3. Conecta el repositorio.
+4. Render crea el web service y la base PostgreSQL, e inyecta `DATABASE_URL`.
+
+El comando de arranque aplica el esquema y luego sirve Next.js:
+
+```bash
+npx drizzle-kit push --force && npm run start
+```
+
+### Opción B — Manual
+
+1. Crea una **PostgreSQL** en Render y copia la Internal (o External) Database URL.
+2. Crea un **Web Service** desde el repo.
+3. Runtime: Node.
+4. Build command:
+
+```bash
+npm install && npm run build
+```
+
+5. Start command:
+
+```bash
+npx drizzle-kit push --force && npm run start
+```
+
+6. Environment:
+
+| Clave | Valor |
+| --- | --- |
+| `DATABASE_URL` | URL de la base Render |
+| `NODE_ENV` | `production` |
+| `NODE_VERSION` | `22` |
+
+Render usa SSL para Postgres; la app ya lo activa fuera de localhost.
+
+## Cómo funciona la sesión
+
+El apodo, color, `userId` y última sala se guardan **solo en tu navegador** (`localStorage`). Por eso, al recargar sigues dentro. Si cambias de dispositivo o borras datos del sitio, tendrás que entrar de nuevo. El servidor no guarda cuentas.
+
+## Licencia de uso
+
+Proyecto listo para clonar, desplegar y adaptar.
