@@ -1,6 +1,6 @@
 "use client";
 
-import { AVATAR_COLORS, FONT_SIZES, THEMES } from "@/lib/constants";
+import { FONT_SIZES } from "@/lib/constants";
 import type { Identity, Settings } from "@/lib/types";
 
 type Props = {
@@ -28,53 +28,22 @@ export function SettingsPanel({
     <div className="drawer-backdrop" onClick={onClose}>
       <aside className="drawer" onClick={(event) => event.stopPropagation()}>
         <header className="drawer-head">
-          <div>
-            <p className="eyebrow">Ajustes</p>
-            <h2>Tu llama</h2>
-          </div>
+          <h2>Ajustes</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Cerrar">
             ✕
           </button>
         </header>
 
         <section className="drawer-section">
-          <h3>Identidad</h3>
+          <h3>Tu apodo</h3>
           <label className="field">
-            <span>Apodo en esta sala</span>
+            <span>Nombre en la sala</span>
             <input
               value={identity.username}
               maxLength={20}
               onChange={(event) => onIdentity({ username: event.target.value })}
             />
           </label>
-          <div className="swatches">
-            {AVATAR_COLORS.map((swatch) => (
-              <button
-                key={swatch}
-                type="button"
-                className={swatch === identity.color ? "swatch active" : "swatch"}
-                style={{ background: swatch }}
-                onClick={() => onIdentity({ color: swatch })}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="drawer-section">
-          <h3>Ambiente</h3>
-          <div className="theme-grid">
-            {THEMES.map((theme) => (
-              <button
-                key={theme.id}
-                type="button"
-                className={settings.theme === theme.id ? "theme-chip active" : "theme-chip"}
-                onClick={() => onSettings({ ...settings, theme: theme.id })}
-              >
-                <i style={{ background: theme.swatch }} />
-                {theme.label}
-              </button>
-            ))}
-          </div>
         </section>
 
         <section className="drawer-section">
@@ -98,7 +67,7 @@ export function SettingsPanel({
                 if (event.target.checked) onRequestNotifications();
               }}
             />
-            <span>Avisos del sistema si estás en otra pestaña</span>
+            <span>Avisos del sistema en otra pestaña</span>
           </label>
           <button type="button" className="ghost-btn full" onClick={onRequestNotifications}>
             Permitir avisos del navegador
@@ -122,22 +91,12 @@ export function SettingsPanel({
           <label className="toggle">
             <input
               type="checkbox"
-              checked={settings.compact}
-              onChange={(event) =>
-                onSettings({ ...settings, compact: event.target.checked })
-              }
-            />
-            <span>Vista compacta</span>
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
               checked={settings.timestamps}
               onChange={(event) =>
                 onSettings({ ...settings, timestamps: event.target.checked })
               }
             />
-            <span>Mostrar hora</span>
+            <span>Mostrar hora en los mensajes</span>
           </label>
           <label className="toggle">
             <input
@@ -152,7 +111,7 @@ export function SettingsPanel({
         </section>
 
         <p className="drawer-note">
-          Nada se archiva. En 24 horas la sala, los mensajes y la presencia se apagan solos.
+          Todo es temporal. La sala, los mensajes y las fotos se borran a las 24 horas.
         </p>
       </aside>
     </div>

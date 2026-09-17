@@ -22,6 +22,8 @@ services:
         fromDatabase:
           name: vela-db
           property: connectionString
+      - key: GIPHY_API_KEY
+        sync: false
 
 databases:
   - name: vela-db

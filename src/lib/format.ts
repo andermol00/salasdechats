@@ -1,4 +1,4 @@
-import { MAX_USERNAME, MIN_USERNAME } from "./constants";
+import { AVATAR_COLORS, MAX_USERNAME, MIN_USERNAME } from "./constants";
 
 export function normalizeCode(raw: string) {
   return raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -51,4 +51,27 @@ export function formatClock(iso: string) {
 export function initials(name: string) {
   const parts = name.trim().split(/\s+/).slice(0, 2);
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+export function colorFor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+export function isAllowedImageSrc(src: string) {
+  return (
+    /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(src) ||
+    /^https:\/\/[^\s"']+\.(gif|png|jpe?g|webp)(\?[^\s"']*)?$/i.test(src)
+  );
+}
+
+export function splitMedia(content: string): { src: string | null; text: string } {
+  if (!content.startsWith("img:")) return { src: null, text: content };
+  const newline = content.indexOf("\n");
+  const rawSrc = newline === -1 ? content.slice(4) : content.slice(4, newline);
+  const text = newline === -1 ? "" : content.slice(newline + 1);
+  return { src: isAllowedImageSrc(rawSrc) ? rawSrc : null, text };
 }

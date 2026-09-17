@@ -1,13 +1,12 @@
 "use client";
 
-import { AVATAR_COLORS } from "@/lib/constants";
 import { generateCode, normalizeCode } from "@/lib/format";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type Props = {
   initialUsername?: string;
-  initialColor?: string;
   initialCode?: string;
+  color: string;
   submitLabel?: string;
   busy?: boolean;
   error?: string | null;
@@ -17,20 +16,15 @@ type Props = {
 
 export function JoinCard({
   initialUsername = "",
-  initialColor,
   initialCode = "",
-  submitLabel = "Encender sala",
+  color,
+  submitLabel = "Crear sala",
   busy = false,
   error,
   lockCode = false,
   onSubmit,
 }: Props) {
-  const fallbackColor = useMemo(
-    () => AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
-    [],
-  );
   const [username, setUsername] = useState(initialUsername);
-  const [color, setColor] = useState(initialColor || fallbackColor);
   const [code, setCode] = useState(initialCode);
 
   return (
@@ -60,7 +54,7 @@ export function JoinCard({
 
       {lockCode ? (
         <p className="code-lock">
-          Código <strong>{initialCode || code}</strong>
+          Sala <strong>{initialCode || code}</strong>
         </p>
       ) : (
         <label className="field">
@@ -69,7 +63,7 @@ export function JoinCard({
             <input
               value={code}
               onChange={(event) => setCode(event.target.value)}
-              placeholder="igual para todos · o déjalo vacío"
+              placeholder="Déjalo vacío para crear una nueva"
               maxLength={24}
               autoCapitalize="off"
               autoCorrect="off"
@@ -85,22 +79,6 @@ export function JoinCard({
           </div>
         </label>
       )}
-
-      <fieldset className="field">
-        <legend>Color</legend>
-        <div className="swatches">
-          {AVATAR_COLORS.map((swatch) => (
-            <button
-              key={swatch}
-              type="button"
-              className={swatch === color ? "swatch active" : "swatch"}
-              style={{ background: swatch }}
-              aria-label={`Color ${swatch}`}
-              onClick={() => setColor(swatch)}
-            />
-          ))}
-        </div>
-      </fieldset>
 
       {error ? <p className="form-error">{error}</p> : null}
 

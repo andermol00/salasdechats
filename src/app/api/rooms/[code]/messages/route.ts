@@ -1,4 +1,4 @@
-import { MAX_MESSAGE_LEN } from "@/lib/constants";
+import { MAX_MEDIA_LEN, MAX_MESSAGE_LEN } from "@/lib/constants";
 import {
   isHexColor,
   isValidCode,
@@ -17,6 +17,9 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ code: string }> };
+
+const MEDIA_PATTERN =
+  /^img:(data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"']+)(\n[\s\S]*)?$/;
 
 export async function POST(request: Request, ctx: Ctx) {
   try {
@@ -44,7 +47,16 @@ export async function POST(request: Request, ctx: Ctx) {
     if (!content) {
       return NextResponse.json({ error: "Escribe un mensaje." }, { status: 400 });
     }
-    if (content.length > MAX_MESSAGE_LEN) {
+
+    const isMedia = content.startsWith("img:");
+    if (isMedia) {
+      if (content.length > MAX_MEDIA_LEN || !MEDIA_PATTERN.test(content)) {
+        return NextResponse.json(
+          { error: "Imagen no válida o demasiado pesada." },
+          { status: 400 },
+        );
+      }
+    } else if (content.length > MAX_MESSAGE_LEN) {
       return NextResponse.json(
         { error: `Máximo ${MAX_MESSAGE_LEN} caracteres.` },
         { status: 400 },

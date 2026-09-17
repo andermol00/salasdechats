@@ -3,14 +3,17 @@
 import { FlameMark } from "@/components/flame-mark";
 import { JoinCard } from "@/components/join-card";
 import { SettingsPanel } from "@/components/settings-panel";
-import { MAX_MESSAGE_LEN, QUICK_EMOJIS } from "@/lib/constants";
+import { MAX_MEDIA_LEN, MAX_MESSAGE_LEN, QUICK_EMOJIS } from "@/lib/constants";
 import {
+  colorFor,
   formatClock,
   formatRemaining,
   initials,
+  isAllowedImageSrc,
   isValidUsername,
   normalizeCode,
   sanitizeUsername,
+  splitMedia,
 } from "@/lib/format";
 import { desktopNotify, playChime, requestDesktopPermission } from "@/lib/notify";
 import {
@@ -34,6 +37,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Props = { code: string };
 
+type GifResult = {
+  id: string;
+  title: string;
+  url: string;
+  preview: string;
+};
+
 export function ChatView({ code }: Props) {
   const router = useRouter();
   const roomCode = normalizeCode(code);
@@ -48,6 +58,12 @@ export function ChatView({ code }: Props) {
   const [messages, setMessages] = useState<MessagePayload[]>([]);
   const [members, setMembers] = useState<MemberPayload[]>([]);
   const [draft, setDraft] = useState("");
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [gifOpen, setGifOpen] = useState(false);
+  const [gifQuery, setGifQuery] = useState("");
+  const [gifResults, setGifResults] = useState<GifResult[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const [gifConfigured, setGifConfigured] = useState(true);
   const [sending, setSending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
@@ -56,6 +72,7 @@ export function ChatView({ code }: Props) {
   const [unread, setUnread] = useState(0);
 
   const scroller = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const knownIds = useRef(new Set<string>());
   const primed = useRef(false);
   const identityRef = useRef<Identity | null>(null);
@@ -71,14 +88,12 @@ export function ChatView({ code }: Props) {
 
   useEffect(() => {
     const stored = loadIdentity();
-    const nextSettings = loadSettings();
-    setSettings(nextSettings);
-    document.documentElement.setAttribute("data-theme", nextSettings.theme);
+    setSettings(loadSettings());
     setIdentity(
       stored ?? {
         userId: ensureUserId(),
         username: "",
-        color: "#f59e0b",
+        color: colorFor(ensureUserId()),
         roomCode: null,
       },
     );
@@ -86,7 +101,6 @@ export function ChatView({ code }: Props) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", settings.theme);
     saveSettings(settings);
   }, [settings]);
 
@@ -100,6 +114,40 @@ export function ChatView({ code }: Props) {
     window.setTimeout(() => setToast(null), 2200);
   }, []);
 
+  const searchGifs = useCallback(async (query: string) => {
+    setGifLoading(true);
+    try {
+      const response = await fetch(`/api/gifs?q=${encodeURIComponent(query)}`);
+      const data = (await response.json()) as {
+        configured?: boolean;
+        gifs?: GifResult[];
+      };
+      setGifConfigured(data.configured !== false);
+      setGifResults(data.gifs ?? []);
+    } catch {
+      setGifResults([]);
+      showToast("No se pudieron cargar los GIFs");
+    } finally {
+      setGifLoading(false);
+    }
+  }, [showToast]);
+
+  function chooseGif(url: string) {
+    if (!isAllowedImageSrc(url)) {
+      showToast("Enlace de GIF no válido");
+      return;
+    }
+    setMediaPreview(url);
+    setGifOpen(false);
+    showToast("GIF listo para enviar");
+  }
+
+  function useGifLink() {
+    const url = gifQuery.trim();
+    if (!url) return;
+    chooseGif(url);
+  }
+
   const applySync = useCallback((data: SyncPayload, selfId: string) => {
     setRoom(data.room);
     setMembers(data.members);
@@ -111,9 +159,10 @@ export function ChatView({ code }: Props) {
       const fromOthers = incoming.filter((message) => message.userId !== selfId);
       if (fromOthers.length > 0) {
         const latest = fromOthers[fromOthers.length - 1];
+        const preview = latest.content.startsWith("img:") ? "Envió una imagen" : latest.content;
         if (settingsRef.current.sound) playChime();
         if (settingsRef.current.desktop) {
-          desktopNotify(`${latest.username} · ${data.room.code}`, latest.content);
+          desktopNotify(`${latest.username} · ${data.room.code}`, preview);
         }
         if (!focused.current) {
           setUnread((count) => count + fromOthers.length);
@@ -171,7 +220,7 @@ export function ChatView({ code }: Props) {
     if (identity.username && isValidUsername(identity.username)) {
       void join({
         username: identity.username,
-        color: identity.color,
+        color: identity.color || colorFor(identity.userId),
         userId: identity.userId,
       });
     }
@@ -194,7 +243,7 @@ export function ChatView({ code }: Props) {
           body: JSON.stringify({
             userId: current.userId,
             username: sanitizeUsername(current.username),
-            color: current.color,
+            color: current.color || colorFor(current.userId),
           }),
         });
         const data = (await response.json()) as SyncPayload & {
@@ -274,18 +323,72 @@ export function ChatView({ code }: Props) {
       )
     : 100;
 
-  const online = useMemo(
-    () => members.filter((member) => member.online),
-    [members],
-  );
+  const online = useMemo(() => members.filter((member) => member.online), [members]);
+
+  function handleFile(file: File | null) {
+    if (!file) return;
+    const isGif = file.type === "image/gif";
+    const isImage = file.type.startsWith("image/");
+    if (!isImage) {
+      showToast("Solo imágenes o GIF");
+      return;
+    }
+    if (isGif) {
+      if (file.size > 500 * 1024) {
+        showToast("GIF muy pesado (máx. 500 KB)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => setMediaPreview(String(reader.result));
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 720;
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+        if (dataUrl.length > MAX_MEDIA_LEN) {
+          showToast("Imagen muy grande, prueba otra");
+          return;
+        }
+        setMediaPreview(dataUrl);
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function send(text = draft) {
     const current = identityRef.current;
     if (!current || sending) return;
-    const content = text.trim();
-    if (!content) return;
+    const caption = text.trim();
+    if (!caption && !mediaPreview) return;
+
+    let content = caption;
+    if (mediaPreview) {
+      if (!isAllowedImageSrc(mediaPreview)) {
+        showToast("Imagen no válida");
+        return;
+      }
+      content = `img:${mediaPreview}` + (caption ? `\n${caption}` : "");
+      if (content.length > MAX_MEDIA_LEN) {
+        showToast("Imagen muy grande, prueba otra");
+        return;
+      }
+    }
+
     setSending(true);
     setDraft("");
+    setMediaPreview(null);
     try {
       const response = await fetch(`/api/rooms/${roomCode}/messages`, {
         method: "POST",
@@ -293,7 +396,7 @@ export function ChatView({ code }: Props) {
         body: JSON.stringify({
           userId: current.userId,
           username: sanitizeUsername(current.username),
-          color: current.color,
+          color: current.color || colorFor(current.userId),
           content,
         }),
       });
@@ -308,7 +411,7 @@ export function ChatView({ code }: Props) {
         return;
       }
       if (!response.ok || !data.message) {
-        setDraft(content);
+        setDraft(caption);
         showToast(data.error || "No se pudo enviar");
         return;
       }
@@ -346,7 +449,11 @@ export function ChatView({ code }: Props) {
 
   function patchIdentity(patch: Partial<Identity>) {
     if (!identity) return;
-    const next = { ...identity, ...patch, username: sanitizeUsername(patch.username ?? identity.username) };
+    const next = {
+      ...identity,
+      ...patch,
+      username: sanitizeUsername(patch.username ?? identity.username),
+    };
     persistIdentity(next);
   }
 
@@ -354,7 +461,6 @@ export function ChatView({ code }: Props) {
     return (
       <main className="boot">
         <FlameMark />
-        <p>Recuperando tu sitio en la sala…</p>
       </main>
     );
   }
@@ -362,28 +468,24 @@ export function ChatView({ code }: Props) {
   if (!inside) {
     return (
       <main className="gate">
-        <div className="landing-media" aria-hidden>
-          <img src="/images/hero.jpg" alt="" />
-          <div className="landing-veil" />
-        </div>
         <div className="gate-card">
           <div className="brand">
             <FlameMark />
             <span>VELA</span>
           </div>
           <p className="eyebrow">Sala {roomCode}</p>
-          <h1>{expired ? "La llama se apagó" : "Entra sin dejar rastro"}</h1>
+          <h1>{expired ? "Esta sala expiró" : "Entra a la sala"}</h1>
           <p className="lede">
             {expired
-              ? "Pasaron 24 horas. Puedes encender una sala nueva con el mismo código."
-              : "Tu apodo se recuerda en este navegador. Al recargar, vuelves adentro."}
+              ? "Pasaron 24 horas y se borró todo. Puedes encenderla de nuevo con el mismo código."
+              : "Elige tu apodo y entra. Si recargas, sigues dentro."}
           </p>
           <JoinCard
             initialUsername={identity.username}
-            initialColor={identity.color}
             initialCode={roomCode}
+            color={identity.color || colorFor(identity.userId)}
             lockCode
-            submitLabel={expired ? "Encender de nuevo" : "Entrar a la sala"}
+            submitLabel={expired ? "Encender de nuevo" : "Entrar"}
             busy={joining}
             error={error}
             onSubmit={(input) =>
@@ -400,7 +502,7 @@ export function ChatView({ code }: Props) {
   }
 
   return (
-    <main className={`chat font-${settings.fontSize} ${settings.compact ? "compact" : ""}`}>
+    <main className={`chat font-${settings.fontSize}`}>
       <div className="life-bar" style={{ width: `${remainingPct}%` }} />
 
       <header className="chat-top">
@@ -410,7 +512,9 @@ export function ChatView({ code }: Props) {
         </button>
         <div className="room-meta">
           <strong>{roomCode}</strong>
-          <span>{formatRemaining(remainingMs)} · {online.length} en la llama</span>
+          <span>
+            {formatRemaining(remainingMs)} · {online.length} en línea
+          </span>
         </div>
         <div className="top-actions">
           <button className="icon-btn" onClick={() => setPeopleOpen(true)} aria-label="Personas">
@@ -420,7 +524,7 @@ export function ChatView({ code }: Props) {
             🔗
           </button>
           <button className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">
-            ⚙
+            ⚙️
           </button>
           <button className="ghost-btn" onClick={() => void leave()}>
             Salir
@@ -458,14 +562,14 @@ export function ChatView({ code }: Props) {
           <div className="scroller" ref={scroller}>
             {messages.length === 0 ? (
               <div className="empty">
-                <img src="/images/empty.jpg" alt="" />
-                <p>La sala está en silencio. El primer mensaje enciende la vela.</p>
+                <p>Nadie ha escrito todavía. Tu primer mensaje enciende la sala.</p>
               </div>
             ) : (
               messages.map((message, index) => {
                 const mine = message.userId === identity.userId;
                 const prev = messages[index - 1];
                 const stacked = prev && prev.userId === message.userId;
+                const media = splitMedia(message.content);
                 return (
                   <article
                     key={message.id}
@@ -479,7 +583,8 @@ export function ChatView({ code }: Props) {
                     ) : settings.timestamps ? (
                       <time className="tiny">{formatClock(message.createdAt)}</time>
                     ) : null}
-                    <p>{message.content}</p>
+                    {media.src ? <img className="bubble-img" src={media.src} alt="" /> : null}
+                    {media.text ? <p>{media.text}</p> : null}
                   </article>
                 );
               })
@@ -494,6 +599,36 @@ export function ChatView({ code }: Props) {
             }}
           >
             <div className="emoji-row">
+              <button
+                type="button"
+                className="attach-btn"
+                onClick={() => fileInput.current?.click()}
+                aria-label="Adjuntar imagen"
+              >
+                🖼️
+              </button>
+              <button
+                type="button"
+                className={gifOpen ? "attach-btn active" : "attach-btn"}
+                onClick={() => {
+                  const next = !gifOpen;
+                  setGifOpen(next);
+                  if (next && gifResults.length === 0) void searchGifs("");
+                }}
+                aria-label="Elegir GIF"
+              >
+                GIF
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                className="hidden-input"
+                onChange={(event) => {
+                  handleFile(event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
+              />
               {QUICK_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
@@ -504,10 +639,71 @@ export function ChatView({ code }: Props) {
                 </button>
               ))}
             </div>
+
+            {gifOpen ? (
+              <div className="gif-picker">
+                <div className="gif-search">
+                  <input
+                    value={gifQuery}
+                    onChange={(event) => setGifQuery(event.target.value)}
+                    placeholder="Busca un GIF o pega su enlace…"
+                    aria-label="Buscar GIF"
+                  />
+                  <button
+                    className="ghost-btn"
+                    type="button"
+                    onClick={() => {
+                      if (/^https:\/\//i.test(gifQuery.trim())) {
+                        useGifLink();
+                      } else {
+                        void searchGifs(gifQuery.trim());
+                      }
+                    }}
+                  >
+                    Buscar
+                  </button>
+                </div>
+                {!gifConfigured ? (
+                  <p className="gif-hint">
+                    Pega un enlace directo de GIF. Para activar la búsqueda añade
+                    <code>GIPHY_API_KEY</code> en Render.
+                  </p>
+                ) : null}
+                {gifLoading ? <p className="gif-status">Cargando GIFs…</p> : null}
+                {!gifLoading && gifConfigured && gifResults.length === 0 ? (
+                  <p className="gif-status">Busca algo como “hola”, “risa” o “fiesta”.</p>
+                ) : null}
+                {gifResults.length > 0 ? (
+                  <div className="gif-grid">
+                    {gifResults.map((gif) => (
+                      <button
+                        key={gif.id}
+                        type="button"
+                        className="gif-card"
+                        onClick={() => chooseGif(gif.url)}
+                        title={gif.title}
+                      >
+                        <img src={gif.preview || gif.url} alt={gif.title} loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {mediaPreview ? (
+              <div className="media-preview">
+                <img src={mediaPreview} alt="" />
+                <button type="button" onClick={() => setMediaPreview(null)}>
+                  Quitar
+                </button>
+              </div>
+            ) : null}
+
             <textarea
               value={draft}
               maxLength={MAX_MESSAGE_LEN}
-              placeholder="Escribe y que se apague mañana…"
+              placeholder="Escribe un mensaje…"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (settings.enterToSend && event.key === "Enter" && !event.shiftKey) {
@@ -517,10 +713,12 @@ export function ChatView({ code }: Props) {
               }}
             />
             <div className="composer-bar">
-              <small>
-                {draft.length}/{MAX_MESSAGE_LEN}
-              </small>
-              <button className="primary-btn" disabled={sending || !draft.trim()} type="submit">
+              <small>{draft.length}/{MAX_MESSAGE_LEN}</small>
+              <button
+                className="primary-btn"
+                disabled={sending || (!draft.trim() && !mediaPreview)}
+                type="submit"
+              >
                 Enviar
               </button>
             </div>

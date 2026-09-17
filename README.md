@@ -10,8 +10,10 @@ Inspirado en la idea de compartir un código para coincidir en la misma sala, co
 - Persistencia local: si recargas, vuelves a la misma sala con el mismo usuario
 - Caducidad real de 24 horas (PostgreSQL + limpieza automática)
 - Lista de personas en línea
+- Envío de fotos y GIF (se comprimen en el navegador y también se borran)
 - Notificaciones sonoras y del sistema (cuando la pestaña no está activa)
-- Ajustes: tema, color, tamaño, vista compacta, Enter para enviar
+- Ajustes: apodo, avisos, tamaño de texto, hora, Enter para enviar
+- Interfaz sobria de colores sólidos, sin cuentas ni historial
 - Enlace de invitación para compartir
 - Pensado para subir a **GitHub** y desplegar en **Render.com**
 
@@ -100,6 +102,17 @@ bash scripts/start.sh
 | `NODE_VERSION` | `22` |
 | `NPM_CONFIG_PRODUCTION` | `false` |
 | `NPM_CONFIG_INCLUDE` | `dev` |
+| `GIPHY_API_KEY` | API key opcional de GIPHY para buscar GIFs |
+
+### Activar el buscador de GIFs
+
+En Render abre **vela-chat → Environment → Add Environment Variable** y añade:
+
+```text
+GIPHY_API_KEY=tu_clave_de_giphy
+```
+
+La clave se lee solamente en el servidor mediante `/api/gifs`; nunca se envía al navegador. Si no la añades, el botón GIF sigue funcionando para pegar enlaces directos o elegir un GIF desde un archivo.
 
 ## Problemas típicos en Render
 

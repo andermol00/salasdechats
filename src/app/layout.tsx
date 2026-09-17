@@ -21,15 +21,12 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "VELA — Chat temporal de 24 horas",
-  description:
-    "Salas de chat temporales. Enciende un código, habla con quien lo conozca y deja que todo se apague en 24 horas.",
+  title: "VELA — Salas temporales de 24 horas",
+  description: "Un espacio breve para lo que quieres decir hoy.",
   icons: { icon: "/favicon.svg" },
   openGraph: {
-    title: "VELA — Chat temporal de 24 horas",
-    description:
-      "Habla ahora. Mañana no queda rastro. Salas compartidas por código, sin cuentas y sin archivo.",
-    images: ["/images/og.jpg"],
+    title: "VELA — Salas temporales de 24 horas",
+    description: "Un espacio breve para lo que quieres decir hoy.",
   },
 };
 

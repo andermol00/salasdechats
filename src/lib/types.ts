@@ -1,11 +1,9 @@
-import type { FontSizeId, ThemeId } from "./constants";
+import type { FontSizeId } from "./constants";
 
 export type Settings = {
-  theme: ThemeId;
   sound: boolean;
   desktop: boolean;
   timestamps: boolean;
-  compact: boolean;
   fontSize: FontSizeId;
   enterToSend: boolean;
 };
@@ -16,8 +14,6 @@ export type Identity = {
   color: string;
   roomCode: string | null;
 };
-
-export type Session = Identity;
 
 export type RoomPayload = {
   id: string;
@@ -52,11 +48,9 @@ export type SyncPayload = {
 };
 
 export const defaultSettings = (): Settings => ({
-  theme: "ember",
   sound: true,
   desktop: true,
   timestamps: true,
-  compact: false,
   fontSize: "md",
   enterToSend: true,
 });
