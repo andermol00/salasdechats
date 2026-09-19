@@ -6,6 +6,7 @@ import {
   normalizeCode,
   sanitizeUsername,
 } from "@/lib/format";
+import { allow } from "@/lib/server/rate-limit";
 import {
   addMessage,
   getActiveRoom,
@@ -46,6 +47,13 @@ export async function POST(request: Request, ctx: Ctx) {
     }
     if (!content) {
       return NextResponse.json({ error: "Escribe un mensaje." }, { status: 400 });
+    }
+
+    if (!allow(`msg:${userId}`, 12, 10_000)) {
+      return NextResponse.json(
+        { error: "Vas muy rápido, espera un momento." },
+        { status: 429 },
+      );
     }
 
     const isMedia = content.startsWith("img:");

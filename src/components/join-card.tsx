@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  DEFAULT_DURATION_HOURS,
+  ROOM_DURATIONS,
+} from "@/lib/constants";
 import { generateCode, normalizeCode } from "@/lib/format";
 import { useState } from "react";
 
@@ -11,7 +15,12 @@ type Props = {
   busy?: boolean;
   error?: string | null;
   lockCode?: boolean;
-  onSubmit: (input: { username: string; color: string; code: string }) => void;
+  onSubmit: (input: {
+    username: string;
+    color: string;
+    code: string;
+    durationHours: number;
+  }) => void;
 };
 
 export function JoinCard({
@@ -26,6 +35,7 @@ export function JoinCard({
 }: Props) {
   const [username, setUsername] = useState(initialUsername);
   const [code, setCode] = useState(initialCode);
+  const [durationHours, setDurationHours] = useState<number>(DEFAULT_DURATION_HOURS);
 
   return (
     <form
@@ -36,6 +46,7 @@ export function JoinCard({
           username,
           color,
           code: normalizeCode(code) || generateCode(),
+          durationHours,
         });
       }}
     >
@@ -57,27 +68,49 @@ export function JoinCard({
           Sala <strong>{initialCode || code}</strong>
         </p>
       ) : (
-        <label className="field">
-          <span>Código de sala</span>
-          <div className="code-row">
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Déjalo vacío para crear una nueva"
-              maxLength={24}
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => setCode(generateCode())}
-            >
-              Azar
-            </button>
+        <>
+          <label className="field">
+            <span>Código de sala</span>
+            <div className="code-row">
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="Déjalo vacío para crear una nueva"
+                maxLength={24}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setCode(generateCode())}
+              >
+                Azar
+              </button>
+            </div>
+          </label>
+
+          <div className="field">
+            <span>La sala se borra en</span>
+            <div className="duration-row" role="radiogroup" aria-label="Duración de la sala">
+              {ROOM_DURATIONS.map((option) => (
+                <button
+                  key={option.hours}
+                  type="button"
+                  role="radio"
+                  aria-checked={durationHours === option.hours}
+                  className={
+                    durationHours === option.hours ? "mini-chip active" : "mini-chip"
+                  }
+                  onClick={() => setDurationHours(option.hours)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </label>
+        </>
       )}
 
       {error ? <p className="form-error">{error}</p> : null}

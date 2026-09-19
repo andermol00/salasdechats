@@ -1,5 +1,7 @@
 import {
   index,
+  integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -12,6 +14,7 @@ export const rooms = pgTable(
   {
     id: text("id").primaryKey(),
     code: text("code").notNull(),
+    durationHours: integer("duration_hours").notNull().default(24),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
@@ -32,11 +35,13 @@ export const messages = pgTable(
     username: text("username").notNull(),
     color: text("color").notNull(),
     content: text("content").notNull(),
+    reactions: jsonb("reactions")
+      .$type<Record<string, string[]>>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    index("messages_room_created_idx").on(table.roomId, table.createdAt),
-  ],
+  (table) => [index("messages_room_created_idx").on(table.roomId, table.createdAt)],
 );
 
 export const members = pgTable(
@@ -50,6 +55,8 @@ export const members = pgTable(
     username: text("username").notNull(),
     color: text("color").notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+    typingAt: timestamp("typing_at", { withTimezone: true }),
   },
   (table) => [
     unique("members_room_user_uidx").on(table.roomId, table.userId),

@@ -9,6 +9,9 @@ import {
   getActiveRoom,
   listMembers,
   listMessages,
+  listMessagesSince,
+  listTyping,
+  markRead,
   purgeExpired,
   serializeRoom,
   upsertMember,
@@ -31,6 +34,9 @@ export async function POST(request: Request, ctx: Ctx) {
       username?: string;
       color?: string;
       userId?: string;
+      typing?: boolean;
+      read?: boolean;
+      since?: string | null;
     };
 
     const username = sanitizeUsername(body.username ?? "");
@@ -45,23 +51,41 @@ export async function POST(request: Request, ctx: Ctx) {
     const room = await getActiveRoom(code);
     if (!room) {
       return NextResponse.json(
-        { error: "Esta sala se apagó. Ya pasaron 24 horas.", expired: true },
+        { error: "Esta sala expiró.", expired: true },
         { status: 410 },
       );
     }
 
-    await upsertMember({ roomId: room.id, userId, username, color });
+    await upsertMember({
+      roomId: room.id,
+      userId,
+      username,
+      color,
+      typing: body.typing === true,
+    });
 
-    const [members, messages] = await Promise.all([
+    const serverTime = new Date().toISOString();
+    if (body.read === true) {
+      await markRead(room.id, userId);
+    }
+
+    const since = body.since ? new Date(body.since) : null;
+    const incremental =
+      since !== null && !Number.isNaN(since.getTime()) && since.getTime() > 0;
+
+    const [members, messages, typing] = await Promise.all([
       listMembers(room.id),
-      listMessages(room.id),
+      incremental ? listMessagesSince(room.id, since as Date) : listMessages(room.id),
+      listTyping(room.id, userId),
     ]);
 
     return NextResponse.json({
       room: serializeRoom(room),
       members,
       messages,
-      serverTime: new Date().toISOString(),
+      typing,
+      incremental,
+      serverTime,
     });
   } catch {
     return NextResponse.json({ error: "Error al sincronizar." }, { status: 500 });

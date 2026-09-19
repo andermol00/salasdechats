@@ -1,4 +1,4 @@
-import { MAX_MESSAGE_LEN } from "@/lib/constants";
+import { DEFAULT_DURATION_HOURS } from "@/lib/constants";
 import {
   generateCode,
   isHexColor,
@@ -7,6 +7,7 @@ import {
   normalizeCode,
   sanitizeUsername,
 } from "@/lib/format";
+import { allow } from "@/lib/server/rate-limit";
 import {
   getOrCreateRoom,
   listMembers,
@@ -26,12 +27,14 @@ export async function POST(request: Request) {
       username?: string;
       color?: string;
       userId?: string;
+      durationHours?: number;
     };
 
     const username = sanitizeUsername(body.username ?? "");
     const color = (body.color ?? "").trim();
     const userId = (body.userId ?? "").trim();
     const code = normalizeCode(body.code?.trim() ? body.code : generateCode());
+    const durationHours = Number(body.durationHours ?? DEFAULT_DURATION_HOURS);
 
     if (!isValidUsername(username)) {
       return NextResponse.json(
@@ -51,9 +54,15 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (!allow(`join:${userId}`, 10, 30_000)) {
+      return NextResponse.json(
+        { error: "Demasiados intentos, espera unos segundos." },
+        { status: 429 },
+      );
+    }
 
     await purgeExpired();
-    const room = await getOrCreateRoom(code);
+    const room = await getOrCreateRoom(code, durationHours);
     await upsertMember({ roomId: room.id, userId, username, color });
 
     const [members, messages] = await Promise.all([
@@ -65,6 +74,8 @@ export async function POST(request: Request) {
       room: serializeRoom(room),
       members,
       messages,
+      typing: [],
+      incremental: false,
       serverTime: new Date().toISOString(),
     });
   } catch {
@@ -76,5 +87,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ maxMessageLen: MAX_MESSAGE_LEN });
+  return NextResponse.json({ maxMessageLen: 1500 });
 }

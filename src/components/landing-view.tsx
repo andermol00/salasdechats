@@ -1,6 +1,6 @@
 "use client";
 
-import { FlameMark } from "@/components/flame-mark";
+import { Brand } from "@/components/brand";
 import { JoinCard } from "@/components/join-card";
 import { colorFor, isValidUsername, sanitizeUsername } from "@/lib/format";
 import {
@@ -24,13 +24,17 @@ export function LandingView() {
   const prefill = (searchParams.get("sala") || searchParams.get("room") || "").trim();
 
   useEffect(() => {
-    const stored = loadIdentity();
-    setIdentity(stored);
+    setIdentity(loadIdentity());
     saveSettings(loadSettings());
     setReady(true);
   }, []);
 
-  async function enter(input: { username: string; color: string; code: string }) {
+  async function enter(input: {
+    username: string;
+    color: string;
+    code: string;
+    durationHours: number;
+  }) {
     const username = sanitizeUsername(input.username);
     if (!isValidUsername(username)) {
       setError("El apodo debe tener entre 2 y 20 caracteres.");
@@ -48,19 +52,17 @@ export function LandingView() {
           username,
           color: input.color,
           code: input.code,
+          durationHours: input.durationHours,
         }),
       });
       const data = (await response.json()) as SyncPayload & { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || "No se pudo entrar.");
-      }
-      const next: Identity = {
+      if (!response.ok) throw new Error(data.error || "No se pudo entrar.");
+      saveIdentity({
         userId,
         username,
         color: input.color,
         roomCode: data.room.code,
-      };
-      saveIdentity(next);
+      });
       router.push(`/sala/${data.room.code}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado.");
@@ -71,21 +73,18 @@ export function LandingView() {
   if (!ready) {
     return (
       <main className="boot">
-        <FlameMark />
+        <Brand />
       </main>
     );
   }
 
   const userId = identity?.userId || "";
-  const color = identity?.color || colorFor(userId || "vela");
+  const color = identity?.color || colorFor(userId || "notrace");
 
   return (
     <main className="landing">
       <header className="landing-top">
-        <div className="brand">
-          <FlameMark />
-          <span>VELA</span>
-        </div>
+        <Brand />
       </header>
 
       <section className="landing-main">
