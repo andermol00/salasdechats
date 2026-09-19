@@ -4,7 +4,6 @@ export type Settings = {
   sound: boolean;
   desktop: boolean;
   timestamps: boolean;
-  readReceipts: boolean;
   fontSize: FontSizeId;
   enterToSend: boolean;
 };
@@ -19,7 +18,7 @@ export type Identity = {
 export type RoomPayload = {
   id: string;
   code: string;
-  durationHours: number;
+  durationMinutes: number;
   createdAt: string;
   expiresAt: string;
 };
@@ -31,7 +30,6 @@ export type MessagePayload = {
   username: string;
   color: string;
   content: string;
-  reactions: Record<string, string[]>;
   createdAt: string;
 };
 
@@ -42,28 +40,28 @@ export type MemberPayload = {
   lastSeenAt: string;
   lastReadAt: string | null;
   online: boolean;
+  typing: boolean;
+};
+
+export type ReactionPayload = {
+  messageId: string;
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
 };
 
 export type SyncPayload = {
   room: RoomPayload;
-  /** Full history on the first call, only new messages afterwards. */
   messages: MessagePayload[];
   members: MemberPayload[];
-  typing: string[];
-  incremental: boolean;
+  reactions: ReactionPayload[];
   serverTime: string;
-};
-
-export type ReactionUpdate = {
-  messageId: string;
-  reactions: Record<string, string[]>;
 };
 
 export const defaultSettings = (): Settings => ({
   sound: true,
   desktop: true,
   timestamps: true,
-  readReceipts: true,
   fontSize: "md",
   enterToSend: true,
 });

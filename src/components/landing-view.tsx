@@ -1,6 +1,6 @@
 "use client";
 
-import { Brand } from "@/components/brand";
+import { NoTraceBrand } from "@/components/no-trace-brand";
 import { JoinCard } from "@/components/join-card";
 import { colorFor, isValidUsername, sanitizeUsername } from "@/lib/format";
 import {
@@ -24,7 +24,8 @@ export function LandingView() {
   const prefill = (searchParams.get("sala") || searchParams.get("room") || "").trim();
 
   useEffect(() => {
-    setIdentity(loadIdentity());
+    const stored = loadIdentity();
+    setIdentity(stored);
     saveSettings(loadSettings());
     setReady(true);
   }, []);
@@ -33,7 +34,7 @@ export function LandingView() {
     username: string;
     color: string;
     code: string;
-    durationHours: number;
+    durationMinutes: number;
   }) {
     const username = sanitizeUsername(input.username);
     if (!isValidUsername(username)) {
@@ -52,17 +53,20 @@ export function LandingView() {
           username,
           color: input.color,
           code: input.code,
-          durationHours: input.durationHours,
+          durationMinutes: input.durationMinutes,
         }),
       });
       const data = (await response.json()) as SyncPayload & { error?: string };
-      if (!response.ok) throw new Error(data.error || "No se pudo entrar.");
-      saveIdentity({
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo entrar.");
+      }
+      const next: Identity = {
         userId,
         username,
         color: input.color,
         roomCode: data.room.code,
-      });
+      };
+      saveIdentity(next);
       router.push(`/sala/${data.room.code}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado.");
@@ -73,18 +77,18 @@ export function LandingView() {
   if (!ready) {
     return (
       <main className="boot">
-        <Brand />
+        <NoTraceBrand compact />
       </main>
     );
   }
 
   const userId = identity?.userId || "";
-  const color = identity?.color || colorFor(userId || "notrace");
+  const color = identity?.color || colorFor(userId || "vela");
 
   return (
     <main className="landing">
       <header className="landing-top">
-        <Brand />
+        <NoTraceBrand />
       </header>
 
       <section className="landing-main">

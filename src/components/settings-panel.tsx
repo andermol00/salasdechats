@@ -111,7 +111,7 @@ export function SettingsPanel({
         </section>
 
         <p className="drawer-note">
-          Todo es temporal. La sala, los mensajes y las fotos se borran a las 24 horas.
+          Todo es temporal. La sala, los mensajes y los archivos se borran al terminar la duración elegida.
         </p>
       </aside>
     </div>

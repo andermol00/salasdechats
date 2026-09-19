@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  DEFAULT_DURATION_HOURS,
-  ROOM_DURATIONS,
+  DEFAULT_ROOM_DURATION_MINUTES,
+  ROOM_DURATION_OPTIONS,
 } from "@/lib/constants";
 import { generateCode, normalizeCode } from "@/lib/format";
 import { useState } from "react";
@@ -19,7 +19,7 @@ type Props = {
     username: string;
     color: string;
     code: string;
-    durationHours: number;
+    durationMinutes: number;
   }) => void;
 };
 
@@ -35,7 +35,7 @@ export function JoinCard({
 }: Props) {
   const [username, setUsername] = useState(initialUsername);
   const [code, setCode] = useState(initialCode);
-  const [durationHours, setDurationHours] = useState<number>(DEFAULT_DURATION_HOURS);
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_ROOM_DURATION_MINUTES);
 
   return (
     <form
@@ -46,7 +46,7 @@ export function JoinCard({
           username,
           color,
           code: normalizeCode(code) || generateCode(),
-          durationHours,
+          durationMinutes,
         });
       }}
     >
@@ -68,50 +68,44 @@ export function JoinCard({
           Sala <strong>{initialCode || code}</strong>
         </p>
       ) : (
-        <>
-          <label className="field">
-            <span>Código de sala</span>
-            <div className="code-row">
-              <input
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="Déjalo vacío para crear una nueva"
-                maxLength={24}
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setCode(generateCode())}
-              >
-                Azar
-              </button>
-            </div>
-          </label>
-
-          <div className="field">
-            <span>La sala se borra en</span>
-            <div className="duration-row" role="radiogroup" aria-label="Duración de la sala">
-              {ROOM_DURATIONS.map((option) => (
-                <button
-                  key={option.hours}
-                  type="button"
-                  role="radio"
-                  aria-checked={durationHours === option.hours}
-                  className={
-                    durationHours === option.hours ? "mini-chip active" : "mini-chip"
-                  }
-                  onClick={() => setDurationHours(option.hours)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+        <label className="field">
+          <span>Código de sala</span>
+          <div className="code-row">
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="Déjalo vacío para crear una nueva"
+              maxLength={24}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => setCode(generateCode())}
+            >
+              Azar
+            </button>
           </div>
-        </>
+        </label>
       )}
+
+      <fieldset className="duration-field">
+        <legend>Duración si la sala es nueva</legend>
+        <div className="duration-options">
+          {ROOM_DURATION_OPTIONS.map((option) => (
+            <button
+              key={option.minutes}
+              type="button"
+              className={durationMinutes === option.minutes ? "duration-btn active" : "duration-btn"}
+              onClick={() => setDurationMinutes(option.minutes)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       {error ? <p className="form-error">{error}</p> : null}
 

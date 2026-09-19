@@ -1,6 +1,6 @@
 # VELA
 
-Salas de chat temporales. Enciendes un código, hablas con quien lo conozca y a las **24 horas** la sala, los mensajes y la presencia se apagan solos. No hay cuentas ni historial permanente.
+Salas de chat temporales sin cuentas. Elige una duración de 1, 3, 6, 12 o 24 horas; al terminar se borra la sala, los mensajes, reacciones, presencia y archivos.
 
 Inspirado en la idea de compartir un código para coincidir en la misma sala, con una experiencia propia: recargas y sigues dentro, avisos de mensajes, temas y ajustes de lectura.
 
@@ -9,10 +9,7 @@ Inspirado en la idea de compartir un código para coincidir en la misma sala, co
 - Crear o entrar a una sala con apodo + código
 - Persistencia local: si recargas, vuelves a la misma sala con el mismo usuario
 - Caducidad real de 24 horas (PostgreSQL + limpieza automática)
-- **Sincronización incremental**: tras la primera carga solo viajan los mensajes nuevos
-- Indicador de "escribiendo…" y lista de personas en línea
-- Límite anti-flood por usuario
-- Reconexión automática con reintentos si se corta la red
+- Lista de personas en línea
 - Envío de fotos y GIF (se comprimen en el navegador y también se borran)
 - Notificaciones sonoras y del sistema (cuando la pestaña no está activa)
 - Ajustes: apodo, avisos, tamaño de texto, hora, Enter para enviar

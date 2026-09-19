@@ -1,25 +1,18 @@
 import { db } from "@/db";
-import { members, messages, rooms } from "@/db/schema";
+import { members, messages, reactions, rooms } from "@/db/schema";
 import {
-  DEFAULT_DURATION_HOURS,
-  MAX_DURATION_HOURS,
-  MIN_DURATION_HOURS,
+  DEFAULT_ROOM_DURATION_MINUTES,
   ONLINE_MS,
   STALE_MEMBER_MS,
   TYPING_MS,
 } from "@/lib/constants";
-import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import type {
   MemberPayload,
   MessagePayload,
-  ReactionUpdate,
+  ReactionPayload,
   RoomPayload,
 } from "@/lib/types";
-
-function clampHours(hours: number) {
-  if (!Number.isFinite(hours)) return DEFAULT_DURATION_HOURS;
-  return Math.min(MAX_DURATION_HOURS, Math.max(MIN_DURATION_HOURS, Math.round(hours)));
-}
 
 export async function purgeExpired() {
   const now = new Date();
@@ -43,27 +36,29 @@ export function serializeRoom(room: typeof rooms.$inferSelect): RoomPayload {
   return {
     id: room.id,
     code: room.code,
-    durationHours: room.durationHours,
+    durationMinutes: room.durationMinutes,
     createdAt: room.createdAt.toISOString(),
     expiresAt: room.expiresAt.toISOString(),
   };
 }
 
-export async function getOrCreateRoom(code: string, durationHours = DEFAULT_DURATION_HOURS) {
+export async function getOrCreateRoom(
+  code: string,
+  durationMinutes = DEFAULT_ROOM_DURATION_MINUTES,
+) {
   const existing = await getActiveRoom(code);
   if (existing) return existing;
 
   const now = new Date();
-  const hours = clampHours(durationHours);
   try {
     const [created] = await db
       .insert(rooms)
       .values({
         id: crypto.randomUUID(),
         code,
-        durationHours: hours,
+        durationMinutes,
         createdAt: now,
-        expiresAt: new Date(now.getTime() + hours * 60 * 60 * 1000),
+        expiresAt: new Date(now.getTime() + durationMinutes * 60_000),
       })
       .returning();
     if (!created) throw new Error("No se pudo crear la sala");
@@ -80,10 +75,8 @@ export async function upsertMember(input: {
   userId: string;
   username: string;
   color: string;
-  typing?: boolean;
 }) {
   const now = new Date();
-  const typingAt = input.typing ? now : null;
   await db
     .insert(members)
     .values({
@@ -93,7 +86,6 @@ export async function upsertMember(input: {
       username: input.username,
       color: input.color,
       lastSeenAt: now,
-      typingAt,
     })
     .onConflictDoUpdate({
       target: [members.roomId, members.userId],
@@ -101,31 +93,8 @@ export async function upsertMember(input: {
         username: input.username,
         color: input.color,
         lastSeenAt: now,
-        typingAt,
       },
     });
-}
-
-export async function markRead(roomId: string, userId: string) {
-  await db
-    .update(members)
-    .set({ lastReadAt: new Date() })
-    .where(and(eq(members.roomId, roomId), eq(members.userId, userId)));
-}
-
-/** Usernames typing in the last few seconds, excluding the caller. */
-export async function listTyping(roomId: string, selfId: string) {
-  const rows = await db.select().from(members).where(eq(members.roomId, roomId));
-  const cutoff = Date.now() - TYPING_MS;
-  return rows
-    .filter(
-      (row) =>
-        row.userId !== selfId &&
-        row.typingAt !== null &&
-        row.typingAt.getTime() > cutoff,
-    )
-    .map((row) => row.username)
-    .slice(0, 6);
 }
 
 export async function listMembers(roomId: string): Promise<MemberPayload[]> {
@@ -137,37 +106,11 @@ export async function listMembers(roomId: string): Promise<MemberPayload[]> {
       username: row.username,
       color: row.color,
       lastSeenAt: row.lastSeenAt.toISOString(),
-      lastReadAt: row.lastReadAt ? row.lastReadAt.toISOString() : null,
+      lastReadAt: row.lastReadAt?.toISOString() ?? null,
       online: now - row.lastSeenAt.getTime() <= ONLINE_MS,
+      typing: Boolean(row.typingUntil && row.typingUntil.getTime() > now),
     }))
-    .sort(
-      (a, b) =>
-        Number(b.online) - Number(a.online) || a.username.localeCompare(b.username),
-    );
-}
-
-function toPayload(row: typeof messages.$inferSelect): MessagePayload {
-  return {
-    id: row.id,
-    roomId: row.roomId,
-    userId: row.userId,
-    username: row.username,
-    color: row.color,
-    content: row.content,
-    reactions: row.reactions ?? {},
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-/** Only the messages newer than `since`, oldest first. Keeps sync payloads tiny. */
-export async function listMessagesSince(roomId: string, since: Date) {
-  const rows = await db
-    .select()
-    .from(messages)
-    .where(and(eq(messages.roomId, roomId), gt(messages.createdAt, since)))
-    .orderBy(asc(messages.createdAt))
-    .limit(200);
-  return rows.map(toPayload);
+    .sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
 }
 
 export async function listMessages(roomId: string): Promise<MessagePayload[]> {
@@ -181,7 +124,37 @@ export async function listMessages(roomId: string): Promise<MessagePayload[]> {
   return rows
     .slice()
     .reverse()
-    .map(toPayload);
+    .map((row) => ({
+      id: row.id,
+      roomId: row.roomId,
+      userId: row.userId,
+      username: row.username,
+      color: row.color,
+      content: row.content,
+      createdAt: row.createdAt.toISOString(),
+    }));
+}
+
+export async function listReactions(
+  roomId: string,
+  userId: string,
+): Promise<ReactionPayload[]> {
+  const rows = await db.select().from(reactions).where(eq(reactions.roomId, roomId));
+  const grouped = new Map<string, ReactionPayload>();
+
+  for (const reaction of rows) {
+    const key = `${reaction.messageId}:${reaction.emoji}`;
+    const current = grouped.get(key) ?? {
+      messageId: reaction.messageId,
+      emoji: reaction.emoji,
+      count: 0,
+      reactedByMe: false,
+    };
+    current.count += 1;
+    current.reactedByMe ||= reaction.userId === userId;
+    grouped.set(key, current);
+  }
+  return [...grouped.values()];
 }
 
 export async function addMessage(input: {
@@ -200,41 +173,80 @@ export async function addMessage(input: {
       username: input.username,
       color: input.color,
       content: input.content,
-      reactions: {},
     })
     .returning();
 
   if (!row) throw new Error("No se pudo guardar el mensaje");
-  return toPayload(row);
+  return {
+    id: row.id,
+    roomId: row.roomId,
+    userId: row.userId,
+    username: row.username,
+    color: row.color,
+    content: row.content,
+    createdAt: row.createdAt.toISOString(),
+  } satisfies MessagePayload;
 }
 
-export async function toggleReaction(
-  roomId: string,
-  messageId: string,
-  userId: string,
-  emoji: string,
-): Promise<ReactionUpdate | null> {
-  const [row] = await db
-    .select()
+export async function messageBelongsToRoom(messageId: string, roomId: string) {
+  const [message] = await db
+    .select({ id: messages.id })
     .from(messages)
     .where(and(eq(messages.id, messageId), eq(messages.roomId, roomId)))
     .limit(1);
-  if (!row) return null;
+  return Boolean(message);
+}
 
-  const current = row.reactions ?? {};
-  const list = new Set(current[emoji] ?? []);
-  if (list.has(userId)) list.delete(userId);
-  else list.add(userId);
+export async function toggleReaction(input: {
+  roomId: string;
+  messageId: string;
+  userId: string;
+  emoji: string;
+}) {
+  const [existing] = await db
+    .select({ id: reactions.id })
+    .from(reactions)
+    .where(
+      and(
+        eq(reactions.roomId, input.roomId),
+        eq(reactions.messageId, input.messageId),
+        eq(reactions.userId, input.userId),
+        eq(reactions.emoji, input.emoji),
+      ),
+    )
+    .limit(1);
 
-  const next: Record<string, string[]> = {};
-  for (const [key, users] of Object.entries(current)) {
-    if (key === emoji) continue;
-    next[key] = users;
+  if (existing) {
+    await db.delete(reactions).where(eq(reactions.id, existing.id));
+    return false;
   }
-  if (list.size > 0) next[emoji] = [...list];
 
-  await db.update(messages).set({ reactions: next }).where(eq(messages.id, messageId));
-  return { messageId, reactions: next };
+  await db.insert(reactions).values({
+    id: crypto.randomUUID(),
+    roomId: input.roomId,
+    messageId: input.messageId,
+    userId: input.userId,
+    emoji: input.emoji,
+  });
+  return true;
+}
+
+export async function markRead(roomId: string, userId: string) {
+  await db
+    .update(members)
+    .set({ lastReadAt: new Date(), lastSeenAt: new Date() })
+    .where(and(eq(members.roomId, roomId), eq(members.userId, userId)));
+}
+
+export async function setTyping(roomId: string, userId: string, typing: boolean) {
+  const now = Date.now();
+  await db
+    .update(members)
+    .set({
+      lastSeenAt: new Date(now),
+      typingUntil: new Date(typing ? now + TYPING_MS : now - 1),
+    })
+    .where(and(eq(members.roomId, roomId), eq(members.userId, userId)));
 }
 
 export async function removeMember(roomId: string, userId: string) {

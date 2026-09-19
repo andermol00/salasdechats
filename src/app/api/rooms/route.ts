@@ -1,4 +1,10 @@
-import { DEFAULT_DURATION_HOURS } from "@/lib/constants";
+import {
+  DEFAULT_ROOM_DURATION_MINUTES,
+  MAX_MESSAGE_LEN,
+  MAX_ROOM_DURATION_MINUTES,
+  MIN_ROOM_DURATION_MINUTES,
+  ROOM_DURATION_OPTIONS,
+} from "@/lib/constants";
 import {
   generateCode,
   isHexColor,
@@ -7,11 +13,11 @@ import {
   normalizeCode,
   sanitizeUsername,
 } from "@/lib/format";
-import { allow } from "@/lib/server/rate-limit";
 import {
   getOrCreateRoom,
   listMembers,
   listMessages,
+  listReactions,
   purgeExpired,
   serializeRoom,
   upsertMember,
@@ -27,14 +33,15 @@ export async function POST(request: Request) {
       username?: string;
       color?: string;
       userId?: string;
-      durationHours?: number;
+      durationMinutes?: number;
     };
 
     const username = sanitizeUsername(body.username ?? "");
     const color = (body.color ?? "").trim();
     const userId = (body.userId ?? "").trim();
     const code = normalizeCode(body.code?.trim() ? body.code : generateCode());
-    const durationHours = Number(body.durationHours ?? DEFAULT_DURATION_HOURS);
+    const requestedDuration = Number(body.durationMinutes ?? DEFAULT_ROOM_DURATION_MINUTES);
+    const durationMinutes = Math.round(requestedDuration);
 
     if (!isValidUsername(username)) {
       return NextResponse.json(
@@ -54,38 +61,36 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (!allow(`join:${userId}`, 10, 30_000)) {
-      return NextResponse.json(
-        { error: "Demasiados intentos, espera unos segundos." },
-        { status: 429 },
-      );
+    if (
+      durationMinutes < MIN_ROOM_DURATION_MINUTES ||
+      durationMinutes > MAX_ROOM_DURATION_MINUTES ||
+      !ROOM_DURATION_OPTIONS.some((option) => option.minutes === durationMinutes)
+    ) {
+      return NextResponse.json({ error: "Duración inválida." }, { status: 400 });
     }
 
     await purgeExpired();
-    const room = await getOrCreateRoom(code, durationHours);
+    const room = await getOrCreateRoom(code, durationMinutes);
     await upsertMember({ roomId: room.id, userId, username, color });
 
-    const [members, messages] = await Promise.all([
+    const [members, messages, reactions] = await Promise.all([
       listMembers(room.id),
       listMessages(room.id),
+      listReactions(room.id, userId),
     ]);
 
     return NextResponse.json({
       room: serializeRoom(room),
       members,
       messages,
-      typing: [],
-      incremental: false,
+      reactions,
       serverTime: new Date().toISOString(),
     });
   } catch {
-    return NextResponse.json(
-      { error: "No se pudo entrar a la sala." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "No se pudo entrar a la sala." }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ maxMessageLen: 1500 });
+  return NextResponse.json({ maxMessageLen: MAX_MESSAGE_LEN });
 }

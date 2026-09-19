@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Outfit } from "next/font/google";
+import { Fraunces, Outfit } from "next/font/google";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -8,29 +8,31 @@ const outfit = Outfit({
   variable: "--font-sans-face",
 });
 
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display-face",
+});
+
 export const viewport: Viewport = {
-  themeColor: "#08080a",
+  themeColor: "#0b0c12",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  // Keeps the layout from jumping when the mobile keyboard opens.
-  interactiveWidget: "resizes-content",
 };
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "No Trace — Salas temporales de 24 horas",
-  description: "Salas de chat temporales. Nada queda guardado.",
-  icons: { icon: "/favicon.svg" },
+  title: "No Trace — Salas temporales",
+  description: "Salas de chat temporales con duración configurable.",
+  icons: { icon: "/no-trace-logo.png" },
   openGraph: {
     title: "No Trace — Salas temporales",
-    description: "Salas de chat temporales. Nada queda guardado.",
+    description: "Salas de chat temporales con duración configurable.",
   },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es" className={outfit.variable}>
+    <html lang="es" className={`${outfit.variable} ${fraunces.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );

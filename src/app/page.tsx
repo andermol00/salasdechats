@@ -6,7 +6,7 @@ export default function HomePage() {
     <Suspense
       fallback={
         <main className="boot">
-          <p>Encendiendo VELA…</p>
+          <p>Abriendo No Trace…</p>
         </main>
       }
     >

@@ -75,3 +75,11 @@ export function splitMedia(content: string): { src: string | null; text: string 
   const text = newline === -1 ? "" : content.slice(newline + 1);
   return { src: isAllowedImageSrc(rawSrc) ? rawSrc : null, text };
 }
+
+export function getYoutubeEmbed(content: string) {
+  const match = content.match(
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i,
+  );
+  if (!match?.[1]) return null;
+  return `https://www.youtube-nocookie.com/embed/${match[1]}?rel=0`;
+}

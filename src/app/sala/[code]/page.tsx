@@ -8,8 +8,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code } = await params;
   const normalized = normalizeCode(code);
   return {
-    title: `VELA · ${normalized || "sala"}`,
-    description: "Sala temporal. Los mensajes se apagan en 24 horas.",
+    title: `No Trace · ${normalized || "sala"}`,
+    description: "Sala temporal de No Trace.",
   };
 }
 
