@@ -84,14 +84,15 @@ img {
 }
 
 .no-trace-brand img {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   object-fit: contain;
+  mix-blend-mode: screen;
 }
 
 .no-trace-brand.compact img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 
 .no-trace-brand.compact {
@@ -649,13 +650,32 @@ fieldset.field {
 .bubble time {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  align-items: baseline;
+  gap: 12px;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+}
+
+.msg-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.msg-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
 }
 
 .bubble b {
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bubble p {

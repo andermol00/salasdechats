@@ -692,7 +692,10 @@ export function ChatView({ code }: Props) {
                     <div className="bubble">
                       {!stacked ? (
                         <header>
-                          <b style={{ color: message.color }}>{message.username}</b>
+                          <span className="msg-author">
+                            <i className="msg-dot" style={{ background: message.color }} />
+                            <b>{message.username || "Usuario"}</b>
+                          </span>
                           {settings.timestamps ? <time>{formatClock(message.createdAt)}</time> : null}
                         </header>
                       ) : settings.timestamps ? (

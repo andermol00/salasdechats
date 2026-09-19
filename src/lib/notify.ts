@@ -49,7 +49,7 @@ export function desktopNotify(title: string, body: string) {
     new Notification(title, {
       body,
       silent: true,
-      icon: "/favicon.svg",
+      icon: "/no-trace-logo.png",
     });
   } catch {
     // Some browsers block notifications without a service worker.
