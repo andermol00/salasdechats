@@ -86,8 +86,20 @@ export async function POST(request: Request) {
       reactions,
       serverTime: new Date().toISOString(),
     });
-  } catch {
-    return NextResponse.json({ error: "No se pudo entrar a la sala." }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo entrar a la sala.";
+    const isDbError = /DATABASE_URL|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|password|authentication|database/i.test(
+      message,
+    );
+    return NextResponse.json(
+      {
+        error: isDbError
+          ? "La base de datos no está disponible. Crea una base PostgreSQL en Render y conecta DATABASE_URL."
+          : "No se pudo entrar a la sala.",
+        reason: message,
+      },
+      { status: 500 },
+    );
   }
 }
 

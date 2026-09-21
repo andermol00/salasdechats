@@ -69,7 +69,8 @@ export function LandingView() {
       saveIdentity(next);
       router.push(`/sala/${data.room.code}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado.");
+      const message = err instanceof Error ? err.message : "Error inesperado.";
+      setError(message);
       setBusy(false);
     }
   }
