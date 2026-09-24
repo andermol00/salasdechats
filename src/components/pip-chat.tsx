@@ -1,6 +1,6 @@
 "use client";
 
-import { parseGifMessage } from "@/lib/gifs";
+import { parseGif } from "@/lib/gifs";
 import { formatClock, initials, splitMedia } from "@/lib/format";
 import type { MemberPayload, MessagePayload } from "@/lib/types";
 import { useEffect, useRef, useState } from "react";
@@ -65,10 +65,8 @@ export function PipChat({
           const mine = message.userId === selfId;
           const prev = messages[index - 1];
           const stacked = prev && prev.userId === message.userId;
-          const parsedGif = parseGifMessage(message.content);
-          const media = parsedGif.gif
-            ? { src: parsedGif.gif.src, text: parsedGif.text }
-            : splitMedia(message.content);
+          const media = splitMedia(message.content);
+          const gif = parseGif(message.content);
           const member = members.find((item) => item.userId === message.userId);
           return (
             <article
@@ -80,15 +78,15 @@ export function PipChat({
                   {mine ? "Tú" : message.username || "Usuario"}
                 </span>
               ) : null}
-              {media.src ? (
-                <img
-                  className="pip-img"
-                  src={media.src}
-                  alt={parsedGif.gif ? `GIF: ${parsedGif.gif.label}` : "Imagen"}
-                  loading="lazy"
-                />
+              {gif.gif ? (
+                <img className="pip-img gif-img" src={gif.gif.src} alt={gif.gif.label} />
               ) : null}
-              {media.text ? <p>{media.text}</p> : null}
+              {media.src ? <img className="pip-img" src={media.src} alt="" /> : null}
+              {gif.gif ? (
+                gif.text ? <p>{gif.text}</p> : null
+              ) : media.text ? (
+                <p>{media.text}</p>
+              ) : null}
               <time>{formatClock(message.createdAt)}</time>
             </article>
           );

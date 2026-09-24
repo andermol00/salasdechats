@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./chat-media.css";
 
 :root {
   --bg: #0b0c12;
@@ -427,13 +426,21 @@ fieldset.field {
 /* ---------- chat ---------- */
 
 .chat {
-  display: grid;
-  grid-template-rows: 3px auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
   background: var(--bg);
   overscroll-behavior: none;
+}
+
+.chat > * {
+  flex: 0 0 auto;
+}
+
+.life-bar {
+  flex: 0 0 3px !important;
 }
 
 .life-bar {
@@ -443,8 +450,6 @@ fieldset.field {
 }
 
 .chat-top {
-  position: relative;
-  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -563,6 +568,7 @@ fieldset.field {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-height: 0;
+  flex: 1 1 auto !important;
 }
 
 .people {
@@ -875,8 +881,6 @@ fieldset.field {
 }
 
 .composer {
-  position: relative;
-  z-index: 4;
   padding: 8px 12px max(12px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: var(--panel);
@@ -918,7 +922,264 @@ fieldset.field {
   color: var(--accent);
 }
 
-/* GIFs y radio compacta: ver chat-media.css */
+/* ---------- GIFs (local pack, no API key) ---------- */
+
+.gif-picker {
+  display: grid;
+  gap: 7px;
+  max-height: 190px;
+  overflow: auto;
+  padding: 9px;
+  margin-bottom: 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.gif-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.gif-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.gif-card {
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.gif-card:hover {
+  border-color: var(--accent);
+  background: #102632;
+}
+
+.gif-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.gif-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* ---------- shared radio ---------- */
+
+.radio {
+  display: grid;
+  gap: 7px;
+  padding: 7px 14px 8px;
+  border-bottom: 1px solid var(--line);
+  background: #0f1119;
+}
+
+.radio-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.radio-info {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.radio-stage {
+  position: relative;
+  flex: 0 0 auto;
+  width: 176px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #000;
+}
+
+.radio-holder,
+.radio-stage iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.radio-unlock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  border: 0;
+  background: rgba(8, 10, 16, 0.82);
+  color: var(--ink);
+}
+
+.radio-unlock strong {
+  font-size: 0.98rem;
+}
+
+.radio-unlock small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.radio-title {
+  min-width: 0;
+}
+
+.radio-title strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radio-title span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.radio-controls {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.radio-controls .icon-btn {
+  width: 30px;
+  height: 26px;
+  font-size: 0.75rem;
+}
+
+.radio-add {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  max-width: 460px;
+}
+
+.radio-add .ghost-btn {
+  padding: 6px 11px;
+  font-size: 0.78rem;
+}
+
+.icon-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #102632;
+}
+
+.radio-add input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: var(--bg);
+  outline: none;
+  font-size: 0.78rem;
+}
+
+.radio-add input:focus {
+  border-color: var(--accent);
+}
+
+.radio-queue {
+  display: grid;
+  gap: 6px;
+  max-height: 148px;
+  overflow: auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.radio-queue ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.radio-queue li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  font-size: 0.8rem;
+}
+
+.radio-queue li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radio-queue li button {
+  border: 0;
+  background: none;
+  color: var(--danger);
+}
+
+.radio-empty,
+.radio-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.radio-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: #101a26;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.radio-mini strong {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.radio-mini em {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 
 /* ---------- picture-in-picture window ---------- */
 
@@ -1275,5 +1536,22 @@ fieldset.field {
   }
   .composer textarea {
     min-height: 44px;
+  }
+  .gif-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .radio-stage {
+    width: 132px;
+  }
+  .radio-main {
+    gap: 9px;
+  }
+  .radio-add {
+    grid-template-columns: 1fr auto;
+    max-width: none;
+  }
+  .pip-img.gif-img {
+    width: 72px;
+    height: 72px;
   }
 }

@@ -24,7 +24,7 @@ import {
 import { RadioPanel, type RadioAction } from "@/components/radio-panel";
 import { GifPicker } from "@/components/gif-picker";
 import { PipChat } from "@/components/pip-chat";
-import { GIF_PREFIX, getGif, parseGifMessage } from "@/lib/gifs";
+import { GIF_PREFIX, getGif, parseGif } from "@/lib/gifs";
 import { desktopNotify, playChime, requestDesktopPermission } from "@/lib/notify";
 import {
   clearRoomFromIdentity,
@@ -145,11 +145,7 @@ export function ChatView({ code }: Props) {
       const fromOthers = incoming.filter((message) => message.userId !== selfId);
       if (fromOthers.length > 0) {
         const latest = fromOthers[fromOthers.length - 1];
-        const preview = latest.content.startsWith(GIF_PREFIX)
-          ? "Envió un GIF"
-          : latest.content.startsWith("img:")
-            ? "Envió una imagen"
-            : latest.content;
+        const preview = latest.content.startsWith("img:") ? "Envió una imagen" : latest.content;
         if (settingsRef.current.sound) playChime();
         if (settingsRef.current.desktop) {
           desktopNotify(`${latest.username} · ${data.room.code}`, preview);
@@ -444,23 +440,12 @@ export function ChatView({ code }: Props) {
       return;
     }
     if (isGif) {
-      // Data URLs are ~4/3 larger than the source file, and the server has a
-      // 400 KB message limit. Local catalogue GIFs are sent by id instead.
-      const maxUploadBytes = Math.floor((MAX_MEDIA_LEN - MAX_MESSAGE_LEN - 100) * 3 / 4);
-      if (file.size > maxUploadBytes) {
-        showToast("GIF muy pesado (máx. 290 KB). Usa los GIFs incluidos.");
+      if (file.size > 500 * 1024) {
+        showToast("GIF muy pesado (máx. 500 KB)");
         return;
       }
       const reader = new FileReader();
-      reader.onload = () => {
-        const source = String(reader.result);
-        if (source.length > MAX_MEDIA_LEN - MAX_MESSAGE_LEN) {
-          showToast("GIF demasiado grande para enviar");
-          return;
-        }
-        setMediaPreview(source);
-        setGifOpen(false);
-      };
+      reader.onload = () => setMediaPreview(String(reader.result));
       reader.readAsDataURL(file);
       return;
     }
@@ -492,16 +477,15 @@ export function ChatView({ code }: Props) {
     const current = identityRef.current;
     if (!current || sending) return;
     const caption = text.trim();
-    const selectedMedia = mediaPreview;
-    if (!caption && !selectedMedia) return;
+    if (!caption && !mediaPreview) return;
 
     let content = caption;
-    if (selectedMedia) {
-      if (!isAllowedImageSrc(selectedMedia)) {
-        showToast("Imagen o GIF no válido");
+    if (mediaPreview) {
+      if (!isAllowedImageSrc(mediaPreview)) {
+        showToast("Imagen no válida");
         return;
       }
-      content = `img:${selectedMedia}` + (caption ? `\n${caption}` : "");
+      content = `img:${mediaPreview}` + (caption ? `\n${caption}` : "");
       if (content.length > MAX_MEDIA_LEN) {
         showToast("Imagen muy grande, prueba otra");
         return;
@@ -527,7 +511,6 @@ export function ChatView({ code }: Props) {
       const data = (await response.json()) as {
         message?: MessagePayload;
         error?: string;
-        detail?: string;
         expired?: boolean;
       };
       if (response.status === 410 || data.expired) {
@@ -537,18 +520,13 @@ export function ChatView({ code }: Props) {
       }
       if (!response.ok || !data.message) {
         setDraft(caption);
-        setMediaPreview(selectedMedia);
-        showToast(data.detail || data.error || "No se pudo enviar");
+        showToast(data.error || "No se pudo enviar");
         return;
       }
       knownIds.current.add(data.message.id);
       setMessages((prev) =>
         prev.some((item) => item.id === data.message!.id) ? prev : [...prev, data.message!],
       );
-    } catch {
-      setDraft(caption);
-      setMediaPreview(selectedMedia);
-      showToast("Sin conexión. Puedes reintentar el envío.");
     } finally {
       setSending(false);
     }
@@ -595,30 +573,8 @@ export function ChatView({ code }: Props) {
   }
 
   async function sendGif(id: string) {
-    if (!getGif(id) || sending) return;
-    const caption = draft.trim();
-    setGifOpen(false);
-    setSending(true);
-    setDraft("");
-    sendTyping(false);
-    try {
-      await postMessage(
-        `${GIF_PREFIX}${id}${caption ? `\n${caption}` : ""}`,
-        () => setDraft(caption),
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  function useGifLink(url: string) {
-    if (!/^https:\/\/[^\s"']+\.gif(\?[^\s"']*)?$/i.test(url) || !isAllowedImageSrc(url)) {
-      showToast("Pega un enlace directo que termine en .gif");
-      return;
-    }
-    setMediaPreview(url);
-    setGifOpen(false);
-    showToast("GIF listo. Pulsa Enviar.");
+    if (!getGif(id)) return;
+    await postMessage(`${GIF_PREFIX}${id}`);
   }
 
   async function radioAction(payload: RadioAction) {
@@ -760,15 +716,16 @@ export function ChatView({ code }: Props) {
           <span>{formatRemaining(remainingMs)} restantes</span>
         </div>
         <div className="top-actions">
-          <RadioPanel
-            radio={radio}
-            roomCode={roomCode}
-            expanded={radioOpen}
-            onToggle={() => setRadioOpen((value) => !value)}
-            onAction={(action) => void radioAction(action)}
-          />
           <button
-            className={pipWindow ? "icon-btn pip-action active" : "icon-btn pip-action"}
+            className={radioOpen ? "icon-btn active" : "icon-btn"}
+            onClick={() => setRadioOpen((value) => !value)}
+            aria-label="Radio de la sala"
+            title="Radio compartida"
+          >
+            📻
+          </button>
+          <button
+            className={pipWindow ? "icon-btn active" : "icon-btn"}
             onClick={() => void openPip()}
             aria-label="Ventana flotante"
             title="Chat en ventana flotante"
@@ -786,6 +743,27 @@ export function ChatView({ code }: Props) {
           </button>
         </div>
       </header>
+
+      {radioOpen ? (
+        <RadioPanel
+          radio={radio}
+          roomCode={roomCode}
+          onAction={(action) => void radioAction(action)}
+          onMinimize={() => setRadioOpen(false)}
+        />
+      ) : null}
+
+      {!radioOpen && radio?.current ? (
+        <button
+          className="radio-mini"
+          type="button"
+          onClick={() => setRadioOpen((value) => !value)}
+        >
+          <span>📻</span>
+          <strong>{radio.current.title}</strong>
+          <em>{radio.playing ? "en vivo" : "en pausa"}</em>
+        </button>
+      ) : null}
 
       <div className="participant-strip" aria-label="Personas en la sala">
         <span className="participant-title">{online.length} en la sala</span>
@@ -814,11 +792,9 @@ export function ChatView({ code }: Props) {
                 const mine = message.userId === identity.userId;
                 const prev = messages[index - 1];
                 const stacked = prev && prev.userId === message.userId;
-                const parsedGif = parseGifMessage(message.content);
-                const media = parsedGif.gif
-                  ? { src: parsedGif.gif.src, text: parsedGif.text }
-                  : splitMedia(message.content);
-                const youtubeEmbed = parsedGif.gif ? null : getYoutubeEmbed(media.text);
+                const media = splitMedia(message.content);
+                const gif = parseGif(message.content);
+                const youtubeEmbed = gif.gif ? null : getYoutubeEmbed(media.text);
                 const messageReactions = reactions.filter((reaction) => reaction.messageId === message.id);
                 const wasRead =
                   mine &&
@@ -845,14 +821,10 @@ export function ChatView({ code }: Props) {
                       ) : settings.timestamps ? (
                         <time className="tiny">{formatClock(message.createdAt)}</time>
                       ) : null}
-                      {media.src ? (
-                        <img
-                          className={parsedGif.gif ? "bubble-img bubble-gif" : "bubble-img"}
-                          src={media.src}
-                          alt={parsedGif.gif ? `GIF animado: ${parsedGif.gif.label}` : "Imagen adjunta"}
-                          loading="lazy"
-                        />
+                      {gif.gif ? (
+                        <img className="bubble-img gif-img" src={gif.gif.src} alt={gif.gif.label} />
                       ) : null}
+                      {media.src ? <img className="bubble-img" src={media.src} alt="" /> : null}
                       {youtubeEmbed ? (
                         <div className="youtube-frame">
                           <iframe
@@ -929,15 +901,14 @@ export function ChatView({ code }: Props) {
                 type="button"
                 className={gifOpen ? "attach-btn active" : "attach-btn"}
                 onClick={() => setGifOpen((value) => !value)}
-                aria-label="Elegir GIF animado"
-                aria-expanded={gifOpen}
+                aria-label="Elegir GIF"
               >
                 GIF
               </button>
               <input
                 ref={fileInput}
                 type="file"
-                accept={gifOpen ? "image/gif" : "image/*"}
+                accept="image/*"
                 className="hidden-input"
                 onChange={(event) => {
                   handleFile(event.target.files?.[0] ?? null);
@@ -957,9 +928,10 @@ export function ChatView({ code }: Props) {
 
             {gifOpen ? (
               <GifPicker
-                onPick={(id) => void sendGif(id)}
-                onUpload={() => fileInput.current?.click()}
-                onDirectLink={useGifLink}
+                onPick={(id) => {
+                  setGifOpen(false);
+                  void sendGif(id);
+                }}
               />
             ) : null}
 

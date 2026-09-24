@@ -12,7 +12,7 @@ import {
   purgeExpired,
   upsertMember,
 } from "@/lib/server/rooms";
-import { GIF_PREFIX, getGif } from "@/lib/gifs";
+import { GIF_PATTERN, GIF_PREFIX, parseGif } from "@/lib/gifs";
 import { describeDbFailure } from "@/lib/server/errors";
 import { NextResponse } from "next/server";
 
@@ -51,25 +51,18 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const isMedia = content.startsWith("img:");
-    const isGif = content.startsWith(GIF_PREFIX);
+    const parsedGif = parseGif(content);
+    const isGif = parsedGif.gif !== null || content.startsWith(GIF_PREFIX);
     if (isMedia) {
-      const newline = content.indexOf("\n");
-      const caption = newline === -1 ? "" : content.slice(newline + 1);
-      if (
-        content.length > MAX_MEDIA_LEN ||
-        caption.length > MAX_MESSAGE_LEN ||
-        !MEDIA_PATTERN.test(content)
-      ) {
+      if (content.length > MAX_MEDIA_LEN || !MEDIA_PATTERN.test(content)) {
         return NextResponse.json(
-          { error: "Imagen o GIF no válido o demasiado pesado." },
+          { error: "Imagen no válida o demasiado pesada." },
           { status: 400 },
         );
       }
     } else if (isGif) {
-      const newline = content.indexOf("\n");
-      const id = newline === -1 ? content.slice(GIF_PREFIX.length) : content.slice(GIF_PREFIX.length, newline);
-      const caption = newline === -1 ? "" : content.slice(newline + 1);
-      if (!getGif(id) || caption.length > MAX_MESSAGE_LEN || content.length > MAX_MESSAGE_LEN + 32) {
+      // Must match the format AND belong to the bundled pack (allowlist).
+      if (content.length > 200 || !GIF_PATTERN.test(content) || !parsedGif.gif) {
         return NextResponse.json({ error: "GIF no válido." }, { status: 400 });
       }
     } else if (content.length > MAX_MESSAGE_LEN) {
