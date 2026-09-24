@@ -1,0 +1,436 @@
+/* Radio and GIF overlays. Neither changes the chat grid height. */
+
+.radio-widget {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.radio-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  max-width: 175px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.radio-trigger.active,
+.radio-trigger:hover,
+.icon-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #102632;
+}
+
+.radio-trigger-title {
+  display: block;
+  min-width: 0;
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.73rem;
+  font-weight: 650;
+}
+
+.radio-live-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #34d399;
+}
+
+.radio-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 12px;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(430px, calc(100dvh - 116px));
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid #394159;
+  border-radius: 12px;
+  background: #151824;
+  box-shadow: 0 14px 32px #0009;
+}
+
+/* Keep the YouTube iframe alive off-screen. Do not use display:none or
+   unmount the player: that would stop the music for the listener. */
+.radio-popover.minimized {
+  position: fixed;
+  top: -1000px;
+  left: -10000px;
+  right: auto;
+  width: 340px;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.radio-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.radio-popover-head strong {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.radio-popover-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.radio-collapse {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.radio-popover .radio-stage {
+  position: relative;
+  width: min(260px, 100%);
+  height: auto;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #000;
+}
+
+.radio-popover .radio-holder,
+.radio-popover .radio-stage iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.radio-unlock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: #0b0c12e8;
+  color: var(--ink);
+  text-align: center;
+}
+
+.radio-unlock strong {
+  font-size: 0.94rem;
+}
+
+.radio-unlock small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.radio-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.radio-title {
+  min-width: 0;
+}
+
+.radio-title strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radio-title span,
+.radio-empty {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.radio-controls {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.radio-controls .icon-btn {
+  width: 31px;
+  height: 31px;
+  font-size: 0.78rem;
+}
+
+.radio-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.radio-add input {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  outline: none;
+  font-size: 0.8rem;
+}
+
+.radio-add input:focus {
+  border-color: var(--accent);
+}
+
+.radio-add .ghost-btn {
+  padding: 7px 10px;
+  font-size: 0.78rem;
+}
+
+.radio-queue {
+  display: grid;
+  gap: 6px;
+}
+
+.radio-queue ul {
+  display: grid;
+  gap: 4px;
+  max-height: 118px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.radio-queue li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  font-size: 0.75rem;
+}
+
+.radio-queue li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radio-queue li button {
+  border: 0;
+  background: none;
+  color: var(--danger);
+}
+
+.radio-empty {
+  margin: 0;
+}
+
+/* Actual .gif assets, not animated SVG stickers. The picker floats over the
+   thread rather than adding a new row to the composer. */
+.gif-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 12px;
+  z-index: 10;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 9px;
+  width: min(478px, calc(100vw - 24px));
+  max-height: min(390px, 55dvh);
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid #394159;
+  border-radius: 12px;
+  background: #151824;
+  box-shadow: 0 14px 32px #0009;
+}
+
+.gif-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.83rem;
+}
+
+.gif-picker-head span {
+  color: var(--muted);
+  font-size: 0.71rem;
+}
+
+.gif-search {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  outline: none;
+  font-size: 0.82rem;
+}
+
+.gif-search:focus,
+.gif-link input:focus {
+  border-color: var(--accent);
+}
+
+.gif-picker .gif-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 7px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.gif-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--ink);
+  text-align: left;
+}
+
+.gif-card:hover,
+.gif-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.gif-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 224 / 144;
+  object-fit: cover;
+}
+
+.gif-card span {
+  overflow: hidden;
+  padding: 4px 7px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gif-empty {
+  grid-column: 1 / -1;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.gif-picker-foot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+}
+
+.gif-picker-foot .ghost-btn {
+  padding: 7px 9px;
+  font-size: 0.75rem;
+}
+
+.gif-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+
+.gif-link input {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  outline: none;
+  font-size: 0.75rem;
+}
+
+.bubble-gif {
+  width: min(224px, 100%);
+  max-height: none;
+  object-fit: contain;
+}
+
+@media (max-width: 860px) {
+  .radio-trigger-title {
+    display: none;
+  }
+  .radio-trigger {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .radio-popover {
+    right: 8px;
+    max-height: min(400px, calc(100dvh - 124px));
+  }
+  .gif-picker {
+    left: 8px;
+    width: calc(100vw - 16px);
+  }
+}
+
+@media (max-width: 560px) {
+  .pip-action {
+    display: none;
+  }
+  .chat-top .top-actions {
+    gap: 3px;
+  }
+  .gif-picker {
+    max-height: min(335px, 48dvh);
+  }
+  .gif-picker .gif-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gif-picker-foot {
+    grid-template-columns: 1fr;
+  }
+  .gif-picker-foot > .ghost-btn {
+    justify-self: start;
+  }
+}

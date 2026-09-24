@@ -12,7 +12,7 @@ import {
   purgeExpired,
   upsertMember,
 } from "@/lib/server/rooms";
-import { STICKER_PATTERN, STICKER_PREFIX } from "@/lib/stickers";
+import { GIF_PREFIX, getGif } from "@/lib/gifs";
 import { describeDbFailure } from "@/lib/server/errors";
 import { NextResponse } from "next/server";
 
@@ -51,17 +51,26 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const isMedia = content.startsWith("img:");
-    const isSticker = content.startsWith(STICKER_PREFIX);
+    const isGif = content.startsWith(GIF_PREFIX);
     if (isMedia) {
-      if (content.length > MAX_MEDIA_LEN || !MEDIA_PATTERN.test(content)) {
+      const newline = content.indexOf("\n");
+      const caption = newline === -1 ? "" : content.slice(newline + 1);
+      if (
+        content.length > MAX_MEDIA_LEN ||
+        caption.length > MAX_MESSAGE_LEN ||
+        !MEDIA_PATTERN.test(content)
+      ) {
         return NextResponse.json(
-          { error: "Imagen no válida o demasiado pesada." },
+          { error: "Imagen o GIF no válido o demasiado pesado." },
           { status: 400 },
         );
       }
-    } else if (isSticker) {
-      if (content.length > 200 || !STICKER_PATTERN.test(content)) {
-        return NextResponse.json({ error: "Sticker no válido." }, { status: 400 });
+    } else if (isGif) {
+      const newline = content.indexOf("\n");
+      const id = newline === -1 ? content.slice(GIF_PREFIX.length) : content.slice(GIF_PREFIX.length, newline);
+      const caption = newline === -1 ? "" : content.slice(newline + 1);
+      if (!getGif(id) || caption.length > MAX_MESSAGE_LEN || content.length > MAX_MESSAGE_LEN + 32) {
+        return NextResponse.json({ error: "GIF no válido." }, { status: 400 });
       }
     } else if (content.length > MAX_MESSAGE_LEN) {
       return NextResponse.json(

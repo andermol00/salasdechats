@@ -28,8 +28,6 @@ services:
         fromDatabase:
           name: notrace-db
           property: connectionString
-      - key: GIPHY_API_KEY
-        sync: false
 
 databases:
   - name: notrace-db
