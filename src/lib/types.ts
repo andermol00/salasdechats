@@ -50,11 +50,30 @@ export type ReactionPayload = {
   reactedByMe: boolean;
 };
 
+export type RadioTrack = {
+  id: string;
+  videoId: string;
+  title: string;
+  addedBy: string;
+  createdAt: string;
+};
+
+export type RadioPayload = {
+  current: RadioTrack | null;
+  queue: RadioTrack[];
+  playing: boolean;
+  /** Playback position in seconds, already computed for `serverTime`. */
+  positionSeconds: number;
+  updatedAt: string | null;
+  serverTime: string;
+};
+
 export type SyncPayload = {
   room: RoomPayload;
   messages: MessagePayload[];
   members: MemberPayload[];
   reactions: ReactionPayload[];
+  radio: RadioPayload;
   serverTime: string;
 };
 

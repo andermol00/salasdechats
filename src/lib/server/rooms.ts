@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { ensureSchema } from "@/db/ensure-schema";
 import { members, messages, reactions, rooms } from "@/db/schema";
 import {
   DEFAULT_ROOM_DURATION_MINUTES,
@@ -15,6 +16,9 @@ import type {
 } from "@/lib/types";
 
 export async function purgeExpired() {
+  // Every route calls this first, so it is the single place where we make
+  // sure the PostgreSQL schema exists before touching any table.
+  await ensureSchema();
   const now = new Date();
   await db.delete(rooms).where(lt(rooms.expiresAt, now));
   await db

@@ -1,49 +1,43 @@
-const HOSTS = [
-  "youtube.com",
-  "www.youtube.com",
-  "m.youtube.com",
-  "music.youtube.com",
-  "youtu.be",
-  "www.youtu.be",
-];
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
-/** Extracts a YouTube video id from watch / share / shorts / embed links. */
-export function extractYouTube(text: string): string | null {
-  const matches = text.match(/https?:\/\/[^\s<]+/g) ?? [];
-  for (const raw of matches) {
-    let url: URL;
-    try {
-      url = new URL(raw);
-    } catch {
-      continue;
-    }
-    if (!HOSTS.includes(url.hostname.toLowerCase())) continue;
+/** Extracts the 11-character video id from any common YouTube URL form. */
+export function parseYoutubeId(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  if (VIDEO_ID.test(raw)) return raw;
 
-    if (url.hostname.toLowerCase().includes("youtu.be")) {
-      const id = url.pathname.slice(1).split("/")[0];
-      if (id) return id;
-      continue;
-    }
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/live\/([A-Za-z0-9_-]{11})/,
+  ];
 
-    const v = url.searchParams.get("v");
-    if (v) return v;
-
-    const parts = url.pathname.split("/").filter(Boolean);
-    const marker = parts[0];
-    if (marker && ["shorts", "embed", "live", "v"].includes(marker)) {
-      const id = parts[1];
-      if (id) return id;
-    }
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match?.[1]) return match[1];
   }
   return null;
 }
 
-/** Removes the YouTube link from the caption so it is not shown twice. */
-export function stripYouTube(text: string): string {
-  return text
-    .replace(/https?:\/\/[^\s<]+/g, (link) => {
-      return extractYouTube(link) ? "" : link;
-    })
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
+/**
+ * Fetches the public video title through YouTube's oEmbed endpoint.
+ * No API key required; if it fails we fall back to a generic label.
+ */
+export async function fetchYoutubeTitle(videoId: string): Promise<string | null> {
+  try {
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(
+      `https://www.youtube.com/watch?v=${videoId}`,
+    )}&format=json`;
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { title?: string };
+    return data.title?.slice(0, 120) ?? null;
+  } catch {
+    return null;
+  }
 }

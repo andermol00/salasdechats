@@ -21,6 +21,10 @@ import {
   sanitizeUsername,
   splitMedia,
 } from "@/lib/format";
+import { RadioPanel, type RadioAction } from "@/components/radio-panel";
+import { StickerPicker, StickerBubble } from "@/components/sticker-picker";
+import { PipChat } from "@/components/pip-chat";
+import { STICKER_PREFIX, getSticker } from "@/lib/stickers";
 import { desktopNotify, playChime, requestDesktopPermission } from "@/lib/notify";
 import {
   clearRoomFromIdentity,
@@ -34,6 +38,7 @@ import type {
   Identity,
   MemberPayload,
   MessagePayload,
+  RadioPayload,
   ReactionPayload,
   RoomPayload,
   Settings,
@@ -41,15 +46,16 @@ import type {
 } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+type DocumentPictureInPicture = {
+  requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
+  window: Window | null;
+};
 
 type Props = { code: string };
 
-type GifResult = {
-  id: string;
-  title: string;
-  url: string;
-  preview: string;
-};
+
 
 export function ChatView({ code }: Props) {
   const router = useRouter();
@@ -67,14 +73,14 @@ export function ChatView({ code }: Props) {
   const [reactions, setReactions] = useState<ReactionPayload[]>([]);
   const [draft, setDraft] = useState("");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [gifOpen, setGifOpen] = useState(false);
-  const [gifQuery, setGifQuery] = useState("");
-  const [gifResults, setGifResults] = useState<GifResult[]>([]);
-  const [gifLoading, setGifLoading] = useState(false);
-  const [gifConfigured, setGifConfigured] = useState(true);
+  const [stickerOpen, setStickerOpen] = useState(false);
+  const [radioOpen, setRadioOpen] = useState(false);
+  const [radio, setRadio] = useState<RadioPayload | null>(null);
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [sending, setSending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [unread, setUnread] = useState(0);
 
@@ -126,45 +132,12 @@ export function ChatView({ code }: Props) {
     window.setTimeout(() => setToast(null), 2200);
   }, []);
 
-  const searchGifs = useCallback(async (query: string) => {
-    setGifLoading(true);
-    try {
-      const response = await fetch(`/api/gifs?q=${encodeURIComponent(query)}`);
-      const data = (await response.json()) as {
-        configured?: boolean;
-        gifs?: GifResult[];
-      };
-      setGifConfigured(data.configured !== false);
-      setGifResults(data.gifs ?? []);
-    } catch {
-      setGifResults([]);
-      showToast("No se pudieron cargar los GIFs");
-    } finally {
-      setGifLoading(false);
-    }
-  }, [showToast]);
-
-  function chooseGif(url: string) {
-    if (!isAllowedImageSrc(url)) {
-      showToast("Enlace de GIF no válido");
-      return;
-    }
-    setMediaPreview(url);
-    setGifOpen(false);
-    showToast("GIF listo para enviar");
-  }
-
-  function useGifLink() {
-    const url = gifQuery.trim();
-    if (!url) return;
-    chooseGif(url);
-  }
-
   const applySync = useCallback((data: SyncPayload, selfId: string) => {
     setRoom(data.room);
     setMembers(data.members);
     setMessages(data.messages);
     setReactions(data.reactions ?? []);
+    if (data.radio) setRadio(data.radio);
     setExpired(false);
 
     const incoming = data.messages.filter((message) => !knownIds.current.has(message.id));
@@ -274,8 +247,11 @@ export function ChatView({ code }: Props) {
             code: roomCode,
           }),
         });
-        const data = (await response.json()) as SyncPayload & { error?: string };
-        if (!response.ok) throw new Error(data.error || "No se pudo entrar.");
+        const data = (await response.json()) as SyncPayload & {
+          error?: string;
+          detail?: string;
+        };
+        if (!response.ok) throw new Error(data.detail || data.error || "No se pudo entrar.");
         persistIdentity({
           userId: input.userId,
           username,
@@ -337,7 +313,17 @@ export function ChatView({ code }: Props) {
           setInside(false);
           return;
         }
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (response.status >= 500) {
+            setServerError(
+              (data as { detail?: string }).detail ||
+                data.error ||
+                "El servidor no pudo sincronizar la sala.",
+            );
+          }
+          return;
+        }
+        setServerError(null);
         applySync(data, current.userId);
       } catch {
         // keep last snapshot if the network blips
@@ -546,6 +532,102 @@ export function ChatView({ code }: Props) {
     }
   }
 
+  async function postMessage(content: string, onFail?: () => void) {
+    const current = identityRef.current;
+    if (!current) return;
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: current.userId,
+          username: sanitizeUsername(current.username),
+          color: current.color || colorFor(current.userId),
+          content,
+        }),
+      });
+      const data = (await response.json()) as {
+        message?: MessagePayload;
+        error?: string;
+        detail?: string;
+        expired?: boolean;
+      };
+      if (response.status === 410 || data.expired) {
+        setExpired(true);
+        setInside(false);
+        return;
+      }
+      if (!response.ok || !data.message) {
+        onFail?.();
+        showToast(data.detail || data.error || "No se pudo enviar");
+        return;
+      }
+      knownIds.current.add(data.message.id);
+      setMessages((prev) =>
+        prev.some((item) => item.id === data.message!.id) ? prev : [...prev, data.message!],
+      );
+    } catch {
+      onFail?.();
+      showToast("Sin conexión");
+    }
+  }
+
+  async function sendSticker(id: string) {
+    if (!getSticker(id)) return;
+    await postMessage(`${STICKER_PREFIX}${id}`);
+  }
+
+  async function radioAction(payload: RadioAction) {
+    const current = identityRef.current;
+    if (!current) return;
+    try {
+      const response = await fetch(`/api/rooms/${roomCode}/radio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, userId: current.userId }),
+      });
+      const data = (await response.json()) as {
+        radio?: RadioPayload;
+        error?: string;
+        expired?: boolean;
+      };
+      if (data.expired) {
+        setExpired(true);
+        setInside(false);
+        return;
+      }
+      if (response.ok && data.radio) setRadio(data.radio);
+      else if (data.error) showToast(data.error);
+    } catch {
+      showToast("No se pudo actualizar la radio");
+    }
+  }
+
+  async function openPip() {
+    if (pipWindow) {
+      pipWindow.close();
+      setPipWindow(null);
+      return;
+    }
+    const api = (window as unknown as { documentPictureInPicture?: DocumentPictureInPicture })
+      .documentPictureInPicture;
+    if (!api?.requestWindow) {
+      showToast("Tu navegador no soporta ventana flotante. Usa Chrome o Edge.");
+      return;
+    }
+    try {
+      const pip = await api.requestWindow({ width: 400, height: 580 });
+      document
+        .querySelectorAll('link[rel="stylesheet"], style')
+        .forEach((node) => pip.document.head.appendChild(node.cloneNode(true)));
+      pip.document.body.className = "pip-body";
+      pip.addEventListener("pagehide", () => setPipWindow(null));
+      setPipWindow(pip);
+    } catch {
+      showToast("No se pudo abrir la ventana flotante");
+    }
+  }
+
   async function leave() {
     const current = identityRef.current;
     if (current) {
@@ -634,6 +716,22 @@ export function ChatView({ code }: Props) {
           <span>{formatRemaining(remainingMs)} restantes</span>
         </div>
         <div className="top-actions">
+          <button
+            className={radioOpen ? "icon-btn active" : "icon-btn"}
+            onClick={() => setRadioOpen((value) => !value)}
+            aria-label="Radio de la sala"
+            title="Radio compartida"
+          >
+            📻
+          </button>
+          <button
+            className={pipWindow ? "icon-btn active" : "icon-btn"}
+            onClick={() => void openPip()}
+            aria-label="Ventana flotante"
+            title="Chat en ventana flotante"
+          >
+            ⧉
+          </button>
           <button className="icon-btn" onClick={() => void copyInvite()} aria-label="Copiar enlace">
             🔗
           </button>
@@ -645,6 +743,22 @@ export function ChatView({ code }: Props) {
           </button>
         </div>
       </header>
+
+      {radioOpen ? (
+        <RadioPanel radio={radio} roomCode={roomCode} onAction={(action) => void radioAction(action)} />
+      ) : null}
+
+      {radio?.current ? (
+        <button
+          className="radio-mini"
+          type="button"
+          onClick={() => setRadioOpen((value) => !value)}
+        >
+          <span>📻</span>
+          <strong>{radio.current.title}</strong>
+          <em>{radio.playing ? "en vivo" : "en pausa"}</em>
+        </button>
+      ) : null}
 
       <div className="participant-strip" aria-label="Personas en la sala">
         <span className="participant-title">{online.length} en la sala</span>
@@ -674,7 +788,12 @@ export function ChatView({ code }: Props) {
                 const prev = messages[index - 1];
                 const stacked = prev && prev.userId === message.userId;
                 const media = splitMedia(message.content);
-                const youtubeEmbed = getYoutubeEmbed(media.text);
+                const sticker = message.content.startsWith(STICKER_PREFIX)
+                  ? getSticker(
+                      message.content.slice(STICKER_PREFIX.length).split("\n")[0].trim(),
+                    )
+                  : null;
+                const youtubeEmbed = sticker ? null : getYoutubeEmbed(media.text);
                 const messageReactions = reactions.filter((reaction) => reaction.messageId === message.id);
                 const wasRead =
                   mine &&
@@ -701,6 +820,7 @@ export function ChatView({ code }: Props) {
                       ) : settings.timestamps ? (
                         <time className="tiny">{formatClock(message.createdAt)}</time>
                       ) : null}
+                      {sticker ? <StickerBubble svg={sticker.svg} /> : null}
                       {media.src ? <img className="bubble-img" src={media.src} alt="" /> : null}
                       {youtubeEmbed ? (
                         <div className="youtube-frame">
@@ -752,6 +872,12 @@ export function ChatView({ code }: Props) {
             </button>
           ) : null}
 
+          {serverError ? (
+            <p className="server-banner" role="alert">
+              ⚠ {serverError}
+            </p>
+          ) : null}
+
           <form
             className="composer"
             onSubmit={(event) => {
@@ -770,15 +896,11 @@ export function ChatView({ code }: Props) {
               </button>
               <button
                 type="button"
-                className={gifOpen ? "attach-btn active" : "attach-btn"}
-                onClick={() => {
-                  const next = !gifOpen;
-                  setGifOpen(next);
-                  if (next && gifResults.length === 0) void searchGifs("");
-                }}
-                aria-label="Elegir GIF"
+                className={stickerOpen ? "attach-btn active" : "attach-btn"}
+                onClick={() => setStickerOpen((value) => !value)}
+                aria-label="Elegir sticker"
               >
-                GIF
+                Stickers
               </button>
               <input
                 ref={fileInput}
@@ -801,55 +923,13 @@ export function ChatView({ code }: Props) {
               ))}
             </div>
 
-            {gifOpen ? (
-              <div className="gif-picker">
-                <div className="gif-search">
-                  <input
-                    value={gifQuery}
-                    onChange={(event) => setGifQuery(event.target.value)}
-                    placeholder="Busca un GIF o pega su enlace…"
-                    aria-label="Buscar GIF"
-                  />
-                  <button
-                    className="ghost-btn"
-                    type="button"
-                    onClick={() => {
-                      if (/^https:\/\//i.test(gifQuery.trim())) {
-                        useGifLink();
-                      } else {
-                        void searchGifs(gifQuery.trim());
-                      }
-                    }}
-                  >
-                    Buscar
-                  </button>
-                </div>
-                {!gifConfigured ? (
-                  <p className="gif-hint">
-                    Pega un enlace directo de GIF. Para activar la búsqueda añade
-                    <code>GIPHY_API_KEY</code> en Render.
-                  </p>
-                ) : null}
-                {gifLoading ? <p className="gif-status">Cargando GIFs…</p> : null}
-                {!gifLoading && gifConfigured && gifResults.length === 0 ? (
-                  <p className="gif-status">Busca algo como “hola”, “risa” o “fiesta”.</p>
-                ) : null}
-                {gifResults.length > 0 ? (
-                  <div className="gif-grid">
-                    {gifResults.map((gif) => (
-                      <button
-                        key={gif.id}
-                        type="button"
-                        className="gif-card"
-                        onClick={() => chooseGif(gif.url)}
-                        title={gif.title}
-                      >
-                        <img src={gif.preview || gif.url} alt={gif.title} loading="lazy" />
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+            {stickerOpen ? (
+              <StickerPicker
+                onPick={(id) => {
+                  setStickerOpen(false);
+                  void sendSticker(id);
+                }}
+              />
             ) : null}
 
             {mediaPreview ? (
@@ -906,6 +986,23 @@ export function ChatView({ code }: Props) {
       />
 
       {toast ? <div className="toast">{toast}</div> : null}
+
+      {pipWindow
+        ? createPortal(
+            <PipChat
+              roomCode={roomCode}
+              messages={messages}
+              members={members}
+              selfId={identity.userId}
+              onSend={(text) => void postMessage(text)}
+              onClose={() => {
+                pipWindow.close();
+                setPipWindow(null);
+              }}
+            />,
+            pipWindow.document.body,
+          )
+        : null}
     </main>
   );
 }

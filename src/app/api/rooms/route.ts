@@ -22,6 +22,8 @@ import {
   serializeRoom,
   upsertMember,
 } from "@/lib/server/rooms";
+import { getRadio } from "@/lib/server/radio";
+import { describeDbFailure } from "@/lib/server/errors";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -73,10 +75,11 @@ export async function POST(request: Request) {
     const room = await getOrCreateRoom(code, durationMinutes);
     await upsertMember({ roomId: room.id, userId, username, color });
 
-    const [members, messages, reactions] = await Promise.all([
+    const [members, messages, reactions, radio] = await Promise.all([
       listMembers(room.id),
       listMessages(room.id),
       listReactions(room.id, userId),
+      getRadio(room.id),
     ]);
 
     return NextResponse.json({
@@ -84,19 +87,15 @@ export async function POST(request: Request) {
       members,
       messages,
       reactions,
+      radio,
       serverTime: new Date().toISOString(),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo entrar a la sala.";
-    const isDbError = /DATABASE_URL|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|password|authentication|database/i.test(
-      message,
-    );
+    console.error("[api/rooms] error:", error);
     return NextResponse.json(
       {
-        error: isDbError
-          ? "La base de datos no está disponible. Crea una base PostgreSQL en Render y conecta DATABASE_URL."
-          : "No se pudo entrar a la sala.",
-        reason: message,
+        error: "No se pudo entrar a la sala.",
+        detail: describeDbFailure(error),
       },
       { status: 500 },
     );

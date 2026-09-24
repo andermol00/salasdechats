@@ -23,7 +23,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "No Trace — Salas temporales",
   description: "Salas de chat temporales con duración configurable.",
-  icons: { icon: "/no-trace-logo.png" },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/no-trace-icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/no-trace-icon.png", sizes: "512x512" }],
+  },
   openGraph: {
     title: "No Trace — Salas temporales",
     description: "Salas de chat temporales con duración configurable.",

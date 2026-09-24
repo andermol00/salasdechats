@@ -1,6 +1,7 @@
 "use client";
 
 import { NoTraceBrand } from "@/components/no-trace-brand";
+import { SetupBanner } from "@/components/setup-banner";
 import { JoinCard } from "@/components/join-card";
 import { colorFor, isValidUsername, sanitizeUsername } from "@/lib/format";
 import {
@@ -56,9 +57,12 @@ export function LandingView() {
           durationMinutes: input.durationMinutes,
         }),
       });
-      const data = (await response.json()) as SyncPayload & { error?: string };
+      const data = (await response.json()) as SyncPayload & {
+        error?: string;
+        detail?: string;
+      };
       if (!response.ok) {
-        throw new Error(data.error || "No se pudo entrar.");
+        throw new Error(data.detail || data.error || "No se pudo entrar.");
       }
       const next: Identity = {
         userId,
@@ -69,8 +73,7 @@ export function LandingView() {
       saveIdentity(next);
       router.push(`/sala/${data.room.code}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error inesperado.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Error inesperado.");
       setBusy(false);
     }
   }

@@ -1,6 +1,12 @@
+# Blueprint de No Trace.
+#
+# Los nombres son solo etiquetas para identificar los recursos en el panel de
+# Render. Puedes cambiarlos cuando quieras: la aplicación nunca los lee,
+# únicamente usa la variable DATABASE_URL.
+
 services:
   - type: web
-    name: notrade
+    name: notrace
     runtime: node
     plan: free
     region: oregon

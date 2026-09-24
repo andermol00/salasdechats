@@ -18,6 +18,22 @@ export const MIN_USERNAME = 2;
 export const SESSION_KEY = "no-trace-session-v1";
 export const SETTINGS_KEY = "no-trace-settings-v1";
 
+/**
+ * Single source of truth for the app identity. Some components (including
+ * older ones) import this instead of hardcoding the name or logo path.
+ */
+export const BRAND = {
+  name: "No Trace",
+  shortName: "NO TRACE",
+  tagline: "Salas temporales",
+  description: "Salas de chat temporales con duración configurable.",
+  logo: "/no-trace-logo.png",
+  logoPath: "/no-trace-logo.png",
+  src: "/no-trace-logo.png",
+  favicon: "/favicon.svg",
+  alt: "No Trace",
+} as const;
+
 export const AVATAR_COLORS = [
   "#60a5fa",
   "#a78bfa",

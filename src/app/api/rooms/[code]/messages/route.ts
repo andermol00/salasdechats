@@ -12,6 +12,8 @@ import {
   purgeExpired,
   upsertMember,
 } from "@/lib/server/rooms";
+import { STICKER_PATTERN, STICKER_PREFIX } from "@/lib/stickers";
+import { describeDbFailure } from "@/lib/server/errors";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -49,12 +51,17 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const isMedia = content.startsWith("img:");
+    const isSticker = content.startsWith(STICKER_PREFIX);
     if (isMedia) {
       if (content.length > MAX_MEDIA_LEN || !MEDIA_PATTERN.test(content)) {
         return NextResponse.json(
           { error: "Imagen no válida o demasiado pesada." },
           { status: 400 },
         );
+      }
+    } else if (isSticker) {
+      if (content.length > 200 || !STICKER_PATTERN.test(content)) {
+        return NextResponse.json({ error: "Sticker no válido." }, { status: 400 });
       }
     } else if (content.length > MAX_MESSAGE_LEN) {
       return NextResponse.json(
@@ -82,7 +89,11 @@ export async function POST(request: Request, ctx: Ctx) {
     });
 
     return NextResponse.json({ message });
-  } catch {
-    return NextResponse.json({ error: "No se pudo enviar." }, { status: 500 });
+  } catch (error) {
+    console.error("[api/rooms/messages] error:", error);
+    return NextResponse.json(
+      { error: "No se pudo enviar.", detail: describeDbFailure(error) },
+      { status: 500 },
+    );
   }
 }

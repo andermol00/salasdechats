@@ -49,7 +49,8 @@ export function desktopNotify(title: string, body: string) {
     new Notification(title, {
       body,
       silent: true,
-      icon: "/no-trace-logo.png",
+      icon: "/no-trace-icon.png",
+      badge: "/no-trace-icon.png",
     });
   } catch {
     // Some browsers block notifications without a service worker.

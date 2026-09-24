@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
+
+PORT="${PORT:-3000}"
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "=========================================================="
+  echo " ERROR: falta la variable DATABASE_URL"
+  echo "=========================================================="
+  echo " En Render:"
+  echo "   1. Abre tu Web Service -> Environment"
+  echo "   2. Add Environment Variable"
+  echo "   3. Key:   DATABASE_URL"
+  echo "   4. Value: Internal Database URL de tu PostgreSQL"
+  echo ""
+  echo " Tambien puedes enlazarla desde tu base de datos en"
+  echo " Render con 'Connect' -> 'Link existing database'."
+  echo "=========================================================="
+  exit 1
+fi
 
 echo "==> No Trace: aplicando esquema en PostgreSQL"
 
@@ -7,17 +25,12 @@ attempt=1
 until npx drizzle-kit push --force; do
   if [ "$attempt" -ge 3 ]; then
     echo "!! No se pudo aplicar el esquema despues de $attempt intentos"
-    attempt=$((attempt + 1))
-    if [ "$attempt" -gt 4 ]; then
-      echo "!! Continuando sin esquema aplicado, el servidor se levantara igual"
-      break
-    fi
-  else
-    echo "-- Reintentando en 5s (intento $attempt)"
+    exit 1
   fi
+  echo "-- Reintentando en 5s (intento $attempt)"
   attempt=$((attempt + 1))
   sleep 5
 done
 
-echo "==> No Trace: arrancando servidor en puerto ${PORT:-3000}"
-exec npx next start -p "${PORT:-3000}"
+echo "==> No Trace: esquema listo, arrancando servidor en puerto ${PORT}"
+exec npx next start -p "${PORT}"

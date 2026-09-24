@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -16,10 +17,33 @@ export const rooms = pgTable(
     durationMinutes: integer("duration_minutes").notNull().default(720),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // Shared YouTube radio: the whole room hears the same second.
+    radioVideoId: text("radio_video_id"),
+    radioTitle: text("radio_title"),
+    radioPlaying: boolean("radio_playing").notNull().default(false),
+    radioPosMs: integer("radio_pos_ms").notNull().default(0),
+    radioUpdatedAt: timestamp("radio_updated_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("rooms_code_idx").on(table.code),
     index("rooms_expires_idx").on(table.expiresAt),
+  ],
+);
+
+export const radioTracks = pgTable(
+  "radio_tracks",
+  {
+    id: text("id").primaryKey(),
+    roomId: text("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    videoId: text("video_id").notNull(),
+    title: text("title").notNull(),
+    addedBy: text("added_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("radio_tracks_room_created_idx").on(table.roomId, table.createdAt),
   ],
 );
 
