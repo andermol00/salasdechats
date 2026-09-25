@@ -61,11 +61,38 @@ export function colorFor(id: string) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+const GIF_CDN_HOSTS = new Set([
+  "i.giphy.com",
+  "giphy.com",
+  "media.tenor.com",
+  "c.tenor.com",
+  "tenor.com",
+  "media.klippy.com",
+  "cdn.klippy.com",
+]);
+
 export function isAllowedImageSrc(src: string) {
-  return (
-    /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(src) ||
-    /^https:\/\/[^\s"']+\.(gif|png|jpe?g|webp)(\?[^\s"']*)?$/i.test(src)
-  );
+  if (/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(src)) return true;
+  if (!src.startsWith("https://") || /[\s"'<>]/.test(src)) return false;
+  let host = "";
+  try {
+    host = new URL(src).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  // Known GIF CDNs serve animated images even at extensionless URLs.
+  if (GIF_CDN_HOSTS.has(host) || host.endsWith(".giphy.com") || host.endsWith(".tenor.com")) {
+    return src.length <= 600;
+  }
+  return /^https:\/\/[^\s"']+\.(gif|png|jpe?g|webp)(\?[^\s"']*)?$/i.test(src);
+}
+
+/** Finds a bare GIF/image URL pasted directly in the chat text. */
+export function extractBareImageUrl(content: string): string | null {
+  const match = content.match(/https:\/\/[^\s"'<>]+/i);
+  if (!match) return null;
+  const url = match[0].replace(/[.,;:!?)]+$/, "");
+  return isAllowedImageSrc(url) ? url : null;
 }
 
 export function splitMedia(content: string): { src: string | null; text: string } {

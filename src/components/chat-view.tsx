@@ -11,6 +11,7 @@ import {
 } from "@/lib/constants";
 import {
   colorFor,
+  extractBareImageUrl,
   formatClock,
   formatRemaining,
   getYoutubeEmbed,
@@ -23,8 +24,9 @@ import {
 } from "@/lib/format";
 import { RadioPanel, type RadioAction } from "@/components/radio-panel";
 import { GifPicker } from "@/components/gif-picker";
+import { LinkText } from "@/components/link-text";
 import { PipChat } from "@/components/pip-chat";
-import { GIF_PREFIX, getGif, parseGif } from "@/lib/gifs";
+import { GIF_PREFIX, getGif, isRemoteGifUrl, parseGif } from "@/lib/gifs";
 import { desktopNotify, playChime, requestDesktopPermission } from "@/lib/notify";
 import {
   clearRoomFromIdentity,
@@ -145,7 +147,11 @@ export function ChatView({ code }: Props) {
       const fromOthers = incoming.filter((message) => message.userId !== selfId);
       if (fromOthers.length > 0) {
         const latest = fromOthers[fromOthers.length - 1];
-        const preview = latest.content.startsWith("img:") ? "Envió una imagen" : latest.content;
+        const preview = latest.content.startsWith("img:")
+          ? "Envió una imagen"
+          : latest.content.startsWith(GIF_PREFIX)
+            ? "Envió un GIF"
+            : latest.content;
         if (settingsRef.current.sound) playChime();
         if (settingsRef.current.desktop) {
           desktopNotify(`${latest.username} · ${data.room.code}`, preview);
@@ -245,6 +251,7 @@ export function ChatView({ code }: Props) {
             username,
             color: input.color,
             code: roomCode,
+            durationMinutes: input.durationMinutes,
           }),
         });
         const data = (await response.json()) as SyncPayload & {
@@ -572,9 +579,23 @@ export function ChatView({ code }: Props) {
     }
   }
 
-  async function sendGif(id: string) {
-    if (!getGif(id)) return;
-    await postMessage(`${GIF_PREFIX}${id}`);
+  async function sendGif(idOrUrl: string) {
+    const value = idOrUrl.trim();
+    if (!value) return;
+    // Remote GIF URL from the picker (validated) or a local pack id.
+    if (value.startsWith("https://")) {
+      if (!isRemoteGifUrl(value)) {
+        showToast("GIF no válido");
+        return;
+      }
+      await postMessage(`${GIF_PREFIX}${value}`);
+      return;
+    }
+    if (!getGif(value)) {
+      showToast("GIF no válido");
+      return;
+    }
+    await postMessage(`${GIF_PREFIX}${value}`);
   }
 
   async function radioAction(payload: RadioAction) {
@@ -794,7 +815,10 @@ export function ChatView({ code }: Props) {
                 const stacked = prev && prev.userId === message.userId;
                 const media = splitMedia(message.content);
                 const gif = parseGif(message.content);
-                const youtubeEmbed = gif.gif ? null : getYoutubeEmbed(media.text);
+                const hasGif = gif.gif !== null || gif.remoteUrl !== null;
+                const youtubeEmbed = hasGif ? null : getYoutubeEmbed(media.text);
+                const bareImage = !hasGif && !media.src ? extractBareImageUrl(media.text) : null;
+                const bodyText = hasGif ? gif.text : media.text;
                 const messageReactions = reactions.filter((reaction) => reaction.messageId === message.id);
                 const wasRead =
                   mine &&
@@ -822,9 +846,49 @@ export function ChatView({ code }: Props) {
                         <time className="tiny">{formatClock(message.createdAt)}</time>
                       ) : null}
                       {gif.gif ? (
-                        <img className="bubble-img gif-img" src={gif.gif.src} alt={gif.gif.label} />
+                        <img
+                          className="bubble-img gif-img"
+                          src={gif.gif.src}
+                          alt={gif.gif.label}
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
                       ) : null}
-                      {media.src ? <img className="bubble-img" src={media.src} alt="" /> : null}
+                      {gif.remoteUrl ? (
+                        <img
+                          className="bubble-img gif-remote"
+                          src={gif.remoteUrl}
+                          alt="GIF"
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      {media.src ? (
+                        <img
+                          className="bubble-img"
+                          src={media.src}
+                          alt=""
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      {bareImage ? (
+                        <img
+                          className="bubble-img gif-remote"
+                          src={bareImage}
+                          alt="GIF"
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
                       {youtubeEmbed ? (
                         <div className="youtube-frame">
                           <iframe
@@ -836,7 +900,11 @@ export function ChatView({ code }: Props) {
                           />
                         </div>
                       ) : null}
-                      {media.text ? <p>{media.text}</p> : null}
+                      {bodyText ? (
+                        <p>
+                          <LinkText text={bodyText} />
+                        </p>
+                      ) : null}
                       {mine ? <span className={wasRead ? "read-receipt read" : "read-receipt"}>{wasRead ? "✓✓ leído" : "✓ enviado"}</span> : null}
                     </div>
                     <div className="reaction-row">

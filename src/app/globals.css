@@ -979,6 +979,85 @@ fieldset.field {
   border: 0 !important;
 }
 
+.gif-remote {
+  width: 100%;
+  max-width: 260px;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.gif-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.gif-tab {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.gif-tab.active {
+  border-color: var(--accent);
+  background: #102632;
+  color: var(--accent);
+}
+
+.gif-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 7px;
+  padding: 7px 10px;
+  outline: none;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.gif-search:focus {
+  border-color: var(--accent);
+}
+
+.gif-search::placeholder {
+  color: var(--muted);
+}
+
+.gif-grid.online {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gif-card.online {
+  aspect-ratio: 1 / 1;
+  padding: 0;
+}
+
+.gif-card.online img {
+  object-fit: cover;
+}
+
+.gif-skeleton {
+  height: 76px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  animation: gif-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes gif-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* ---------- shared radio ---------- */
 
 .radio {
@@ -1539,6 +1618,9 @@ fieldset.field {
   }
   .gif-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .gif-grid.online {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .radio-stage {
     width: 132px;
