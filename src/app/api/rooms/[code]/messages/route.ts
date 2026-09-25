@@ -12,7 +12,7 @@ import {
   purgeExpired,
   upsertMember,
 } from "@/lib/server/rooms";
-import { GIF_PATTERN, GIF_PREFIX, parseGif } from "@/lib/gifs";
+import { GIF_PREFIX, isValidGifContent } from "@/lib/gifs";
 import { describeDbFailure } from "@/lib/server/errors";
 import { NextResponse } from "next/server";
 
@@ -51,8 +51,7 @@ export async function POST(request: Request, ctx: Ctx) {
     }
 
     const isMedia = content.startsWith("img:");
-    const parsedGif = parseGif(content);
-    const isGif = parsedGif.gif !== null || content.startsWith(GIF_PREFIX);
+    const isGif = content.startsWith(GIF_PREFIX);
     if (isMedia) {
       if (content.length > MAX_MEDIA_LEN || !MEDIA_PATTERN.test(content)) {
         return NextResponse.json(
@@ -61,8 +60,8 @@ export async function POST(request: Request, ctx: Ctx) {
         );
       }
     } else if (isGif) {
-      // Must match the format AND belong to the bundled pack (allowlist).
-      if (content.length > 200 || !GIF_PATTERN.test(content) || !parsedGif.gif) {
+      // Local ids are allow-listed, remote https URLs are host-validated.
+      if (!isValidGifContent(content)) {
         return NextResponse.json({ error: "GIF no válido." }, { status: 400 });
       }
     } else if (content.length > MAX_MESSAGE_LEN) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { parseGif } from "@/lib/gifs";
+import { LinkText } from "@/components/link-text";
 import { formatClock, initials, splitMedia } from "@/lib/format";
 import type { MemberPayload, MessagePayload } from "@/lib/types";
 import { useEffect, useRef, useState } from "react";
@@ -79,13 +80,45 @@ export function PipChat({
                 </span>
               ) : null}
               {gif.gif ? (
-                <img className="pip-img gif-img" src={gif.gif.src} alt={gif.gif.label} />
+                <img
+                  className="pip-img gif-img"
+                  src={gif.gif.src}
+                  alt={gif.gif.label}
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
               ) : null}
-              {media.src ? <img className="pip-img" src={media.src} alt="" /> : null}
-              {gif.gif ? (
-                gif.text ? <p>{gif.text}</p> : null
+              {gif.remoteUrl ? (
+                <img
+                  className="pip-img"
+                  src={gif.remoteUrl}
+                  alt="GIF"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+              {media.src ? (
+                <img
+                  className="pip-img"
+                  src={media.src}
+                  alt=""
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+              {gif.gif || gif.remoteUrl ? (
+                gif.text ? (
+                  <p>
+                    <LinkText text={gif.text} />
+                  </p>
+                ) : null
               ) : media.text ? (
-                <p>{media.text}</p>
+                <p>
+                  <LinkText text={media.text} />
+                </p>
               ) : null}
               <time>{formatClock(message.createdAt)}</time>
             </article>

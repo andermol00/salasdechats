@@ -108,15 +108,6 @@ async function run() {
   }
 }
 
-async function schemaExists() {
-  const db = getDb();
-  const result = await db.execute<{ present: string | null }>(
-    sql`select to_regclass('public.rooms')::text as present`,
-  );
-  const rows = (result as unknown as { rows?: { present: string | null }[] }).rows ?? [];
-  return Boolean(rows[0]?.present);
-}
-
 export function ensureSchema(): Promise<void> {
   const fresh =
     globalForSchema.__noTraceSchemaCheckedAt !== undefined &&
@@ -128,8 +119,9 @@ export function ensureSchema(): Promise<void> {
 
   if (!globalForSchema.__noTraceSchemaReady) {
     globalForSchema.__noTraceSchemaReady = (async () => {
-      // Skip the DDL burst when the schema is already in place.
-      if (await schemaExists()) return;
+      // Always run the DDL: every statement is IF NOT EXISTS / ADD COLUMN
+      // IF NOT EXISTS, so it is cheap when the schema is already in place
+      // and it heals partial schemas (missing tables or columns).
       await run();
     })().then(
       () => {
