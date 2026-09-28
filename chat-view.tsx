@@ -1004,15 +1004,6 @@ export function ChatView({ code }: Props) {
                 pipWindow.close();
                 setPipWindow(null);
               }}
-              onMinimize={() => {
-                // Minimizar la ventana PIP
-                if (pipWindow.innerHeight > 100) {
-                  pipWindow.resizeTo(pipWindow.innerWidth, 60);
-                } else {
-                  pipWindow.resizeTo(pipWindow.innerWidth, 300);
-                }
-              }}
-              onReact={(messageId, emoji) => void reactToMessage(messageId, emoji)}
             />,
             pipWindow.document.body,
           )
