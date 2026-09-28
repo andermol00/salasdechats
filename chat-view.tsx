@@ -823,9 +823,9 @@ export function ChatView({ code }: Props) {
                       ) : null}
                       {gif.gif ? (
                         <img className="bubble-img gif-img" src={gif.gif.src} alt={gif.gif.label} />
-                      ) : gif.klippyUrl ? (
-                        <img className="bubble-img gif-img" src={gif.klippyUrl} alt="Klippy GIF" />
-                      ) : null}
+                      ) : gif.remoteUrl ? (
+  <img className="bubble-img gif-img" src={gif.remoteUrl} alt="GIF remote" />
+) : null}
                       {media.src ? <img className="bubble-img" src={media.src} alt="" /> : null}
                       {youtubeEmbed ? (
                         <div className="youtube-frame">
