@@ -999,7 +999,6 @@ export function ChatView({ code }: Props) {
               messages={messages}
               members={members}
               selfId={identity.userId}
-              reactions={reactions}
               onSend={(text) => void postMessage(text)}
               onClose={() => {
                 pipWindow.close();
