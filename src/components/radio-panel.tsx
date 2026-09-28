@@ -10,7 +10,16 @@ export type RadioAction =
   | { action: "pause" }
   | { action: "next"; expectVideoId?: string }
   | { action: "remove"; trackId: string }
-  | { action: "clear" };
+  | { action: "clear" }
+  | { action: "shuffle" }
+  | { action: "savePlaylist"; name: string };
+
+type Playlist = {
+  id: string;
+  name: string;
+  tracks: Array<{ videoId: string; title: string }>;
+  createdAt: Date;
+};
 
 type Props = {
   radio: RadioPayload | null;
@@ -34,8 +43,28 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
   const [unlocked, setUnlocked] = useState(false);
   const [url, setUrl] = useState("");
   const [showQueue, setShowQueue] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [showPlaylists, setShowPlaylists] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [volume, setVolume] = useState(70);
 
   const current = radio?.current ?? null;
+
+  // Cargar playlists desde localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`playlists_${roomCode}`);
+      if (saved) setPlaylists(JSON.parse(saved));
+    } catch {}
+  }, [roomCode]);
+
+  // Guardar playlists
+  useEffect(() => {
+    if (playlists.length > 0) {
+      localStorage.setItem(`playlists_${roomCode}`, JSON.stringify(playlists));
+    }
+  }, [playlists, roomCode]);
 
   useEffect(() => {
     if (radio) {
@@ -53,6 +82,34 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
     return seconds + (Date.now() - at) / 1000;
   }
 
+  const saveCurrentPlaylist = () => {
+    if (!newPlaylistName.trim() || !radio?.queue.length) return;
+
+    const newPlaylist: Playlist = {
+      id: `playlist_${Date.now()}`,
+      name: newPlaylistName,
+      tracks: radio.queue.map((track) => ({
+        videoId: track.videoId || "",
+        title: track.title,
+      })),
+      createdAt: new Date(),
+    };
+
+    setPlaylists((prev) => [...prev, newPlaylist]);
+    setNewPlaylistName("");
+  };
+
+  const loadPlaylist = (playlist: Playlist) => {
+    playlist.tracks.forEach((track) => {
+      onAction({ action: "add", url: `https://youtube.com/watch?v=${track.videoId}` });
+    });
+    setShowPlaylists(false);
+  };
+
+  const deletePlaylist = (id: string) => {
+    setPlaylists((prev) => prev.filter((p) => p.id !== id));
+  };
+
   // Create the player once.
   useEffect(() => {
     let disposed = false;
@@ -62,7 +119,12 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
         player.current = new YT.Player(holder.current, {
           height: "100%",
           width: "100%",
-          playerVars: { controls: 1, modestbranding: 1, rel: 0, playsinline: 1 },
+          playerVars: {
+            controls: 1,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+          },
           events: {
             onReady: () => setReady(true),
             onStateChange: (event: { data: number }) => {
@@ -85,7 +147,7 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Follow the shared state: load track, play/pause and fix drift.
+  // Follow the shared state
   useEffect(() => {
     const instance = player.current;
     if (!ready || !instance || !radio) return;
@@ -111,6 +173,9 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
       return;
     }
 
+    // Aplicar volumen
+    instance.setVolume?.(volume);
+
     const want = expectedSeconds();
     if (radio.playing) {
       instance.playVideo();
@@ -123,9 +188,9 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.videoId, radio?.playing, radio?.positionSeconds, ready, unlocked]);
+  }, [current?.videoId, radio?.playing, radio?.positionSeconds, ready, unlocked, volume]);
 
-  // Periodic drift correction so everyone stays on the same second.
+  // Periodic drift correction
   useEffect(() => {
     if (!ready || !unlocked || !current || !radio?.playing) return;
     const timer = window.setInterval(() => {
@@ -138,6 +203,20 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, unlocked, current?.videoId, radio?.playing]);
+
+  if (minimized) {
+    return (
+      <div className="radio-minimized">
+        <button
+          className="radio-restore"
+          onClick={() => setMinimized(false)}
+          title="Restaurar radio"
+        >
+          🎵 {current?.title?.substring(0, 20) || "Radio"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section className="radio">
@@ -157,11 +236,25 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
             <strong>{current ? current.title : "Nada suena todavía"}</strong>
             <span>
               {current
-                ? `${radio?.playing ? "Sonando" : "En pausa"} · cola ${
-                    radio?.queue.length ?? 0
-                  }`
+                ? `${radio?.playing ? "Sonando" : "En pausa"} · cola ${radio?.queue.length ?? 0}`
                 : "Pega un enlace de YouTube para empezar"}
             </span>
+          </div>
+
+          {/* Controles de volumen */}
+          <div className="radio-volume">
+            <label htmlFor="radio-vol">🔊</label>
+            <input
+              id="radio-vol"
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => setVolume(parseInt(e.target.value))}
+              className="volume-slider"
+              disabled={!unlocked}
+            />
+            <span className="volume-value">{volume}%</span>
           </div>
 
           <div className="radio-controls">
@@ -189,6 +282,14 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
               ⏭
             </button>
             <button
+              className="icon-btn"
+              type="button"
+              aria-label="Mezclar"
+              onClick={() => onAction({ action: "shuffle" })}
+            >
+              🔀
+            </button>
+            <button
               className={showQueue ? "icon-btn active" : "icon-btn"}
               type="button"
               aria-label="Ver cola"
@@ -197,12 +298,28 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
               ☰ {radio?.queue.length ?? 0}
             </button>
             <button
+              className={showPlaylists ? "icon-btn active" : "icon-btn"}
+              type="button"
+              aria-label="Playlists"
+              onClick={() => setShowPlaylists((value) => !value)}
+            >
+              💾 {playlists.length}
+            </button>
+            <button
               className="icon-btn"
               type="button"
-              aria-label="Minimizar radio"
+              aria-label="Minimizar"
+              onClick={() => setMinimized(true)}
+            >
+              ━
+            </button>
+            <button
+              className="icon-btn"
+              type="button"
+              aria-label="Cerrar"
               onClick={() => onMinimize?.()}
             >
-              ⌄
+              ✕
             </button>
           </div>
 
@@ -228,16 +345,29 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
         </div>
       </div>
 
+      {/* Cola */}
       {showQueue ? (
         <div className="radio-queue">
           {radio && radio.queue.length > 0 ? (
             <>
-              <ul>
-                {radio.queue.map((track) => (
-                  <li key={track.id}>
-                    <span>{track.title}</span>
+              <div className="radio-queue-header">
+                <h4>Cola ({radio.queue.length})</h4>
+                <button
+                  className="icon-btn"
+                  type="button"
+                  onClick={() => setShowQueue(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <ul className="radio-queue-list">
+                {radio.queue.map((track, idx) => (
+                  <li key={track.id} className="queue-item">
+                    <span className="queue-number">{idx + 1}</span>
+                    <span className="queue-title">{track.title}</span>
                     <button
                       type="button"
+                      className="icon-btn-sm"
                       aria-label="Quitar"
                       onClick={() => onAction({ action: "remove", trackId: track.id })}
                     >
@@ -253,9 +383,71 @@ export function RadioPanel({ radio, roomCode, onAction, onMinimize }: Props) {
               >
                 Vaciar cola
               </button>
+              <button
+                className="ghost-btn full"
+                type="button"
+                onClick={saveCurrentPlaylist}
+              >
+                💾 Guardar como Playlist
+              </button>
+              {saveCurrentPlaylist && (
+                <input
+                  type="text"
+                  placeholder="Nombre de la playlist…"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  className="playlist-name-input"
+                />
+              )}
             </>
           ) : (
             <p className="radio-empty">La cola está vacía.</p>
+          )}
+        </div>
+      ) : null}
+
+      {/* Playlists */}
+      {showPlaylists ? (
+        <div className="radio-playlists">
+          <div className="playlists-header">
+            <h4>Playlists ({playlists.length})</h4>
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={() => setShowPlaylists(false)}
+            >
+              ✕
+            </button>
+          </div>
+          {playlists.length > 0 ? (
+            <ul className="playlists-list">
+              {playlists.map((playlist) => (
+                <li key={playlist.id} className="playlist-item">
+                  <div className="playlist-info">
+                    <span className="playlist-name">{playlist.name}</span>
+                    <span className="playlist-count">{playlist.tracks.length} canciones</span>
+                  </div>
+                  <div className="playlist-actions">
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => loadPlaylist(playlist)}
+                    >
+                      Cargar
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn-sm"
+                      onClick={() => deletePlaylist(playlist.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="radio-empty">Sin playlists guardadas.</p>
           )}
         </div>
       ) : null}
