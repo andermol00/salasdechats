@@ -17,7 +17,7 @@ export const rooms = pgTable(
     durationMinutes: integer("duration_minutes").notNull().default(720),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    // Shared YouTube radio: the whole room hears the same second.
+    // Shared YouTube radio
     radioVideoId: text("radio_video_id"),
     radioTitle: text("radio_title"),
     radioPlaying: boolean("radio_playing").notNull().default(false),
@@ -100,5 +100,51 @@ export const reactions = pgTable(
   (table) => [
     unique("reactions_message_user_emoji_uidx").on(table.messageId, table.userId, table.emoji),
     index("reactions_room_message_idx").on(table.roomId, table.messageId),
+  ],
+);
+
+// TABLA DE ADMIN - Modo Dios (secreto, cifrado)
+export const godModeAdmins = pgTable(
+  "god_mode_admins",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().unique(),
+    passwordHash: text("password_hash").notNull(), // SHA256
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastAccessAt: timestamp("last_access_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("god_mode_admins_user_idx").on(table.userId),
+  ],
+);
+
+// TOKEN SESSION TEMPORAL PARA MODO DIOS
+export const godModeTokens = pgTable(
+  "god_mode_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("god_mode_tokens_expires_idx").on(table.expiresAt),
+  ],
+);
+
+// LOG DE ACCESO MODO DIOS (PARA AUDITORÍA)
+export const godModeAudit = pgTable(
+  "god_mode_audit",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    action: text("action").notNull(), // 'view_rooms', 'view_messages', 'login'
+    roomId: text("room_id"),
+    messageCount: integer("message_count"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("god_mode_audit_user_created_idx").on(table.userId, table.createdAt),
   ],
 );
